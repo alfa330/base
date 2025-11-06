@@ -96,7 +96,7 @@
     </header>
 
     <main class="grid cols-2" style="align-items:start">
-      <!-- LEFT: Start form + Branches (expanded & visual) -->
+      <!-- LEFT: Runs and Logs -->
       <section>
         <div class="card" style="margin-bottom:12px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -136,7 +136,29 @@
           </div>
         </div>
 
-        <!-- Branches: BIG and visually clear -->
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-weight:700">Active runs</div>
+            <div class="small muted">Текущие запуски</div>
+          </div>
+          <div class="runs-list" id="runs"></div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-weight:700">Event log</div>
+            <div class="small muted">Последние события</div>
+          </div>
+          <div id="log" class="log-area"></div>
+          <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end">
+            <button id="btnClearLog" class="ghost">Очистить</button>
+            <button id="btnDownloadLog" class="ghost" disabled>Скачать лог (последний)</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: Branches -->
+      <aside>
         <div class="card">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
             <div>
@@ -161,29 +183,6 @@
           <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
             <button id="btnRefreshDirs" class="ghost">Обновить ветки</button>
             <button id="btnDownloadSelected" class="ghost" disabled>Download selected</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- RIGHT: Runs and Logs -->
-      <aside>
-        <div class="card" style="margin-bottom:12px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div style="font-weight:700">Active runs</div>
-            <div class="small muted">Текущие запуски</div>
-          </div>
-          <div class="runs-list" id="runs"></div>
-        </div>
-
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div style="font-weight:700">Event log</div>
-            <div class="small muted">Последние события</div>
-          </div>
-          <div id="log" class="log-area"></div>
-          <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end">
-            <button id="btnClearLog" class="ghost">Очистить</button>
-            <button id="btnDownloadLog" class="ghost" disabled>Скачать лог (последний)</button>
           </div>
         </div>
       </aside>
