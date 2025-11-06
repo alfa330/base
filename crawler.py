@@ -16,6 +16,7 @@ import json
 import hashlib
 from pathlib import Path
 from collections import deque
+from typing import Optional
 
 DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; ChatGPTBot/1.0; +https://openai.com/)"
 DEFAULT_CONCURRENCY = 5
@@ -25,6 +26,7 @@ MAX_RAW_HTML_BYTES = 200_000
 def setup_logging(level=logging.INFO):
     fmt = "%(asctime)s [%(levelname)s] %(message)s"
     logging.basicConfig(level=level, format=fmt)
+
 
 def canonicalize_url(url: str, keep_query: bool = False, drop_utm: bool = True) -> str:
     parsed = urlparse(url)
@@ -41,7 +43,8 @@ def canonicalize_url(url: str, keep_query: bool = False, drop_utm: bool = True) 
         path = path.rstrip("/")
     return urlunparse((scheme, netloc, path, params, query, fragment))
 
-def is_same_host_or_prefix(url: str, base_netloc: str, target_prefix: str | None) -> bool:
+
+def is_same_host_or_prefix(url: str, base_netloc: str, target_prefix: Optional[str]) -> bool:
     p = urlparse(url)
     base = urlparse(base_netloc)
     if p.scheme not in ("http", "https"):
@@ -52,6 +55,7 @@ def is_same_host_or_prefix(url: str, base_netloc: str, target_prefix: str | None
         return p.path.startswith(target_prefix)
     return True
 
+
 def make_safe_filename(index: int, url: str, title: str) -> str:
     parsed = urlparse(url)
     path = parsed.path.rstrip("/")
@@ -59,6 +63,7 @@ def make_safe_filename(index: int, url: str, title: str) -> str:
     base = slugify(last) or slugify(title or "") or "page"
     h = hashlib.md5(url.encode("utf-8")).hexdigest()[:6]
     return f"{index:05d}_{base}_{h}.json"
+
 
 def extract_text(soup: BeautifulSoup) -> tuple[str, str]:
     selectors = ["main", "article", "[role=main]", ".article", ".content", "#content"]
@@ -79,19 +84,20 @@ def extract_text(soup: BeautifulSoup) -> tuple[str, str]:
     content = "\n\n".join(parts).strip()
     return title, content
 
+
 class AsyncCrawler:
     def __init__(
         self,
         start_url: str,
-        base_url: str | None = None,
-        target_prefix: str | None = None,
+        base_url: Optional[str] = None,
+        target_prefix: Optional[str] = None,
         output_dir: str = "output_async",
         concurrency: int = DEFAULT_CONCURRENCY,
         sleep: float = DEFAULT_SLEEP,
-        max_pages: int | None = None,
+        max_pages: Optional[int] = None,
         save_html: bool = False,
         timeout: int = 20,
-        user_agent: str = DEFAULT_USER_AGENT,
+        user_agent: Optional[str] = None,
         status_callback=None,  # callable(status_dict) called on updates
     ):
         self.start_url = start_url
@@ -107,7 +113,7 @@ class AsyncCrawler:
         self.max_pages = max_pages
         self.save_html = save_html
         self.timeout = timeout
-        self.headers = {"User-Agent": user_agent}
+        self.headers = {"User-Agent": user_agent or DEFAULT_USER_AGENT}
         self.visited: set[str] = set()
         self.to_visit = deque()
         self.visited_file = self.output_dir / "visited.txt"
@@ -117,15 +123,16 @@ class AsyncCrawler:
         self._init_robots()
         self._stop_event = asyncio.Event()
         self.status_callback = status_callback
+        self.logger = logging.getLogger("crawler")
 
     def _init_robots(self):
         robots_url = urljoin(self.base_netloc, "/robots.txt")
         try:
             self.rp.set_url(robots_url)
             self.rp.read()
-            logging.info(f"Loaded robots.txt from {robots_url}")
+            self.logger.info("Loaded robots.txt from %s", robots_url)
         except Exception as e:
-            logging.warning(f"Could not read robots.txt: {e}")
+            self.logger.warning("Could not read robots.txt (%s)", e)
 
     def allowed_by_robots(self, url: str) -> bool:
         try:
@@ -140,13 +147,13 @@ class AsyncCrawler:
                 for line in text.splitlines():
                     if line.strip():
                         self.visited.add(line.strip())
-            logging.info(f"Resumed: loaded {len(self.visited)} visited URLs")
+            self.logger.info("Resumed: loaded %d visited URLs", len(self.visited))
 
     async def persist_visited(self, url: str):
         async with aiofiles.open(self.visited_file, mode="a", encoding="utf-8") as f:
             await f.write(url + "\n")
 
-    async def fetch(self, session: aiohttp.ClientSession, url: str, max_attempts: int = 4) -> tuple[str | None, aiohttp.ClientResponse | None]:
+    async def fetch(self, session: aiohttp.ClientSession, url: str, max_attempts: int = 4) -> tuple[Optional[str], Optional[aiohttp.ClientResponse]]:
         attempt = 0
         backoff = 1.0
         while attempt < max_attempts and not self._stop_event.is_set():
@@ -156,10 +163,10 @@ class AsyncCrawler:
                     async with session.get(url, headers=self.headers) as resp:
                         status = resp.status
                         if status in (403, 451):
-                            logging.error(f"Forbidden ({status}) for {url}")
+                            self.logger.error("Forbidden (%s) for %s", status, url)
                             return None, resp
                         if status >= 400:
-                            logging.warning(f"Bad status {status} for {url}")
+                            self.logger.warning("Bad status %s for %s", status, url)
                             if status in (429, 500, 502, 503, 504) and attempt < max_attempts:
                                 await asyncio.sleep(backoff)
                                 backoff *= 2
@@ -167,12 +174,12 @@ class AsyncCrawler:
                             return None, resp
                         ctype = resp.headers.get("Content-Type", "")
                         if "text/html" not in ctype:
-                            logging.info(f"Skipping non-html {url} (Content-Type: {ctype})")
+                            self.logger.info("Skipping non-html %s (Content-Type: %s)", url, ctype)
                             return None, resp
                         text = await resp.text()
                         return text, resp
             except (asyncio.TimeoutError, ClientError) as e:
-                logging.warning(f"Fetch error for {url} (attempt {attempt}): {e}")
+                self.logger.warning("Fetch error for %s (attempt %d): %s", url, attempt, e)
                 if attempt < max_attempts:
                     await asyncio.sleep(backoff)
                     backoff *= 2
@@ -214,24 +221,29 @@ class AsyncCrawler:
         fname = make_safe_filename(self.index, url, title)
         out_path = self.output_dir / fname
         # write json and md asynchronously
-        async with aiofiles.open(out_path, mode="w", encoding="utf-8") as f:
-            await f.write(json.dumps(data, ensure_ascii=False, indent=2))
+        try:
+            async with aiofiles.open(out_path, mode="w", encoding="utf-8") as f:
+                await f.write(json.dumps(data, ensure_ascii=False, indent=2))
+        except Exception:
+            self.logger.exception("Failed to write JSON file %s", out_path)
 
         md_name = fname.replace(".json", ".md")
         md_path = self.output_dir / md_name
-        async with aiofiles.open(md_path, mode="w", encoding="utf-8") as f:
-            await f.write(f"# {data.get('title','')}\n\n")
-            await f.write(f"Source: {data['url']}\n\n")
-            await f.write(data.get("content", ""))
+        try:
+            async with aiofiles.open(md_path, mode="w", encoding="utf-8") as f:
+                await f.write(f"# {data.get('title','')}\n\n")
+                await f.write(f"Source: {data['url']}\n\n")
+                await f.write(data.get("content", ""))
+        except Exception:
+            self.logger.exception("Failed to write MD file %s", md_path)
 
-        logging.info(f"Saved [{self.index}] {url} -> {out_path.name}")
+        self.logger.info("Saved [%d] %s -> %s", self.index, url, out_path.name)
         if self.pbar:
             self.pbar.update(1)
 
         # --- realtime push to UI via status_callback ---
         if self.status_callback:
             try:
-                # Ограничиваем размер content, чтобы не перегружать WS
                 MAX_CONTENT_LEN = 20_000
                 payload = {
                     "type": "saved",
@@ -239,12 +251,13 @@ class AsyncCrawler:
                     "file": out_path.name,
                     "url": url,
                     "title": title,
-                    "content": content[:MAX_CONTENT_LEN],
+                    "content": (content or "")[:MAX_CONTENT_LEN],
                 }
-                # если callback синхронный — он должен принять dict; в main.py он запланирует broadcast
+                self.logger.debug("Calling status_callback for %s -> %s", url, out_path.name)
+                # status_callback is synchronous by contract here (will schedule async broadcast)
                 self.status_callback(payload)
             except Exception:
-                logging.exception("status_callback failed after saving file")
+                self.logger.exception("status_callback failed after saving file")
 
     async def worker(self, session: aiohttp.ClientSession):
         while not self._stop_event.is_set():
@@ -257,7 +270,7 @@ class AsyncCrawler:
             if url in self.visited:
                 continue
             if not self.allowed_by_robots(url):
-                logging.info(f"Disallowed by robots.txt: {url}")
+                self.logger.info("Disallowed by robots.txt: %s", url)
                 self.visited.add(url)
                 await self.persist_visited(url)
                 continue
@@ -275,13 +288,13 @@ class AsyncCrawler:
                     for link in links:
                         if link not in self.visited and link not in self.to_visit:
                             self.to_visit.append(link)
-                except Exception as e:
-                    logging.warning(f"Error extracting links from {url}: {e}")
+                except Exception:
+                    self.logger.exception("Error extracting links from %s", url)
 
                 try:
                     await self.parse_and_save(url, html)
-                except Exception as e:
-                    logging.exception(f"Error parsing/saving {url}: {e}")
+                except Exception:
+                    self.logger.exception("Error parsing/saving %s", url)
 
                 self.visited.add(url)
                 await self.persist_visited(url)
@@ -297,10 +310,17 @@ class AsyncCrawler:
             workers_count = max(2, self.concurrent * 2)
             tasks = [asyncio.create_task(self.worker(session)) for _ in range(workers_count)]
             if self.status_callback:
-                self.status_callback({"type": "started", "start_url": self.start_url})
+                # send started event
+                try:
+                    self.status_callback({"type": "started", "start_url": self.start_url})
+                except Exception:
+                    self.logger.exception("status_callback failed for started event")
             await asyncio.gather(*tasks)
         if self.status_callback:
-            self.status_callback({"type": "finished", "pages_saved": self.index})
+            try:
+                self.status_callback({"type": "finished", "pages_saved": self.index})
+            except Exception:
+                self.logger.exception("status_callback failed for finished event")
 
     def stop(self):
         self._stop_event.set()
