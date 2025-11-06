@@ -1,0 +1,13 @@
+aiogram==2.25.2
+flask==3.0.2
+apscheduler==3.10.4
+requests==2.31.0
+python-dotenv==1.0.1
+openpyxl==3.1.5
+xlsxwriter==3.2.3
+flask-cors==4.0.1
+psycopg2-binary==2.9.9
+passlib==1.7.4
+google-cloud-storage==2.18.2
+pandas==2.2.2
+packaging>=23.0
