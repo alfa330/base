@@ -270,7 +270,7 @@ class AsyncCrawler:
         # --- realtime push to UI via status_callback (file points to md) ---
         if self.status_callback:
             try:
-                MAX_CONTENT_LEN = 20_000
+                MAX_CONTENT_LEN = 300
                 # branch relative path
                 branch_rel = str(md_path.parent.relative_to(self.output_dir))
                 payload = {

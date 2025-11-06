@@ -256,10 +256,10 @@
 const API = '/api'; // local crawler backend (expects /list, /start, /stop/:id, /output/:name, /dirs, /download_dir/:branch, /logs/:id)
 const API_BASE_URL = 'https://otp-2-fos4.onrender.com'; // external auth service (provided)
 const WS_PATH = '/ws';
-const MAX_CONTENT_LEN = 20000; // when showing full content in UI, trim to this
-const PREVIEW_LEN = 2000; // how many chars of content kept as preview on client
+const MAX_CONTENT_LEN = 200; // when showing full content in UI, trim to this
+const PREVIEW_LEN = 200; // how many chars of content kept as preview on client
 const FILE_BATCH_MS = 250; // batching window for incoming WS saved events
-const MAX_LOG_CHARS = 200000; // limit log size in UI
+const MAX_LOG_CHARS = 10000; // limit log size in UI
 
 /* ========== STATE ========== */
 let ws = null;
@@ -372,6 +372,15 @@ let fileUpdateBuffer = [];
 let fileRenderTimer = null;
 
 function queueFileUpdate(item){
+    if(fileUpdateBuffer.length > 1000){
+    // apply immediately to avoid unbounded growth
+    clearTimeout(fileRenderTimer);
+    fileRenderTimer = null;
+    for(const it of fileUpdateBuffer) addOrUpdateFileImmediate(it);
+    fileUpdateBuffer = [];
+    renderFiles();
+    return;
+  }
   // keep only necessary pieces of item to avoid memory bloat
   const slim = {
     file: item.file,
