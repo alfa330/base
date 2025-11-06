@@ -6,7 +6,7 @@ import shutil
 import tempfile
 from pathlib import Path
 from typing import Optional, List, Dict, Any
-
+import json
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
