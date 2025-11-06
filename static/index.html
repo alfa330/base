@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Async Crawler — Control (logs & directories)</title>
+  <title>Async Crawler — Control (auth required)</title>
   <style>
     :root{
       --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#60a5fa; --accent-2:#7c3aed; --text:#e6eef8;
@@ -16,7 +16,7 @@
       --glass: rgba(2,6,23,0.03);
     }
     *{box-sizing:border-box}
-    html,body{height:100%; margin:0; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial; background:linear-gradient(180deg,var(--bg), #071029); color:var(--text); -webkit-font-smoothing:antialiased}
+    html,body{height:100%; margin:0; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:linear-gradient(180deg,var(--bg), #071029); color:var(--text); -webkit-font-smoothing:antialiased}
     .container{max-width:1100px; margin:28px auto; padding:20px}
     header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
     h1{font-size:20px;margin:0}
@@ -25,98 +25,137 @@
     .card{background:var(--card); padding:14px; border-radius:var(--radius); box-shadow:0 6px 20px rgba(2,6,23,0.5); border:1px solid rgba(255,255,255,0.03)}
     .grid{display:grid; gap:14px}
     .cols-3{grid-template-columns: 1.3fr 1fr 0.9fr}
+    .cols-2{grid-template-columns: 1fr 1fr}
     label{font-size:13px;color:var(--muted)}
-    input, select { width:100%; padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:var(--text) }
+    input[type="text"], input[type="number"], input[type="password"], select { width:100%; padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:var(--text) }
+    input[type="checkbox"]{transform:scale(1.1); margin-right:6px}
     button { background:linear-gradient(90deg,var(--accent),var(--accent-2)); border:none; color:white; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:600 }
     button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06); color:var(--text); font-weight:600}
+    button:disabled, .ghost[disabled]{opacity:0.45;cursor:not-allowed}
     .row{display:flex;gap:10px;align-items:center}
     .small{font-size:13px;color:var(--muted)}
     .muted{color:var(--muted)}
-    .runs-list{display:flex;flex-direction:column; gap:8px; max-height:40vh; overflow:auto}
+    #files{max-height:46vh; overflow:auto; display:flex; flex-direction:column; gap:8px; padding-top:8px}
+    .file-item{display:flex; gap:12px; align-items:flex-start; padding:10px; border-radius:10px; background:var(--glass); border:1px solid rgba(255,255,255,0.02)}
+    .file-meta{flex:1}
+    .file-actions{display:flex;gap:8px;align-items:center}
+    .fname{font-weight:700}
+    .ftitle{color:var(--muted); font-size:13px; margin-top:4px}
+    pre.preview{background:rgba(0,0,0,0.12); padding:8px; border-radius:8px; max-height:160px; overflow:auto; margin-top:8px; white-space:pre-wrap}
+    .runs-list{display:flex;flex-direction:column; gap:8px; max-height:24vh; overflow:auto}
     .run-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:8px;background:var(--glass)}
-    .log-area{height:320px; overflow:auto; background:rgba(0,0,0,0.06); padding:10px; border-radius:8px; font-family:monospace; font-size:12px; color:var(--muted)}
-    .branches{display:flex;flex-direction:column;gap:8px;max-height:40vh;overflow:auto;margin-top:8px}
-    .branch-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02)}
-    .branch-name{font-weight:700}
+    .log-area{height:150px; overflow:auto; background:rgba(0,0,0,0.06); padding:10px; border-radius:8px; font-family:monospace; font-size:12px; color:var(--muted)}
+    .controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .search{display:flex; gap:8px; align-items:center; margin-bottom:8px}
+    .tag{display:inline-block;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.02);font-size:12px;color:var(--muted)}
     footer{margin-top:18px;color:var(--muted);font-size:13px;text-align:center}
     .toast{position:fixed;right:20px;bottom:20px;padding:10px 16px;border-radius:10px;background:#111827;color:white;box-shadow:0 6px 20px rgba(2,6,23,0.5);z-index:80}
     .btn-danger{background:#ef4444}
+    .dir-list{display:flex;flex-direction:column;gap:8px;max-height:18vh;overflow:auto;margin-top:8px}
+    .dir-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)}
+    .dir-meta{font-size:13px;color:var(--muted)}
+    /* login modal */
     .modal-backdrop{position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:100}
     .modal{width:360px;background:var(--card);padding:16px;border-radius:12px;box-shadow:0 10px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.04)}
-    @media (max-width:980px){ .cols-3{grid-template-columns: 1fr} .modal{width:92%} }
+    .modal h3{margin:0 0 8px 0}
+    .modal .error{color:#f87171;margin-top:8px}
+    .modal .row{margin-top:10px}
+    .mini{font-size:12px;color:var(--muted)}
+    @media (max-width:980px){
+      .cols-3{grid-template-columns: 1fr}
+      .modal{width:92%}
+    }
   </style>
 </head>
 <body>
-  <div class="container" id="appRoot">
+  <div class="container" id="appRoot" aria-hidden="false">
     <header>
       <div>
         <h1>Async Crawler — Control</h1>
-        <div class="sub">Теперь: только логи и директории. Файлы — по запросу.</div>
+        <div class="sub">Запускай обход, смотри результаты в реальном времени через WebSocket</div>
       </div>
       <div class="top-actions">
-        <div class="small muted">WS: <span id="ws_status">—</span></div>
+        <div class="small muted">Тек. соединение: <span id="ws_status">—</span></div>
         <div id="userBlock" style="display:flex;align-items:center;gap:8px">
-          <div class="small muted" id="userName">—</div>
+          <div class="mini muted" id="userName">—</div>
           <button id="btnLogin" class="ghost">Вход</button>
           <button id="btnLogout" class="ghost" style="display:none">Выйти</button>
         </div>
-        <button id="btnRefresh" class="ghost">Обновить</button>
+        <button id="btnRefresh" class="ghost" title="Обновить список файлов">Обновить</button>
+        <button id="toggleTheme" class="ghost">Тёмная/Светлая</button>
       </div>
     </header>
 
 ```
 <main class="grid cols-3" style="align-items:start">
-  <!-- Left: Start form -->
+  <!-- Left: Start form + Outputs -->
   <section>
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div>
           <div style="font-weight:700">Start new crawl</div>
-          <div class="small muted">Запуск краулера на сервере</div>
+          <div class="small muted">Укажи стартовый URL и опции</div>
         </div>
-        <div class="small muted" id="last_run_info">—</div>
+        <div class="tag" id="last_run_info">—</div>
       </div>
 
-      <label>Start URL
-        <input id="start_url" type="text" placeholder="https://example.com/path" />
-      </label>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <label style="flex:1">Prefix (optional)
-          <input id="prefix" type="text" placeholder="/docs/path" />
+      <div style="display:grid;gap:8px">
+        <label>Start URL
+          <input id="start_url" type="text" placeholder="https://example.com/path" />
         </label>
-        <label style="width:120px">Concurrency
-          <input id="concurrency" type="number" value="5" min="1" />
-        </label>
+
+        <div style="display:flex;gap:8px">
+          <label style="flex:1">Prefix (optional)
+            <input id="prefix" type="text" placeholder="/docs/path" />
+          </label>
+          <label style="width:120px">Concurrency
+            <input id="concurrency" type="number" value="5" min="1" />
+          </label>
+        </div>
+
+        <div class="row">
+          <label><input id="save_html" type="checkbox" /> Save raw HTML</label>
+          <label class="small muted" style="margin-left:auto">Max preview: <span id="max_preview">20000</span> chars</label>
+        </div>
+
+        <div class="controls" style="margin-top:6px">
+          <button id="btnStart" disabled>Start</button>
+          <button id="btnStartBG" class="ghost" title="Start in background" disabled>Start (bg)</button>
+          <button id="btnList" class="ghost" disabled>List outputs</button>
+        </div>
+
+        <pre id="start_result" class="log-area" style="margin-top:10px"></pre>
       </div>
-      <div class="row" style="margin-top:8px">
-        <label><input id="save_html" type="checkbox" /> Save raw HTML</label>
-        <div style="margin-left:auto"></div>
+    </div>
+
+    <div style="height:16px"></div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-weight:700">Outputs</div>
+        <div class="small muted">Файлы появляются автоматически</div>
       </div>
-      <div style="display:flex;gap:8px;margin-top:10px">
-        <button id="btnStart" disabled>Start</button>
-        <button id="btnStopAll" class="btn-danger" disabled>Stop all runs</button>
-        <button id="btnRefreshDirs" class="ghost">Refresh branches</button>
+
+      <div class="search">
+        <input id="q" type="text" placeholder="Поиск по имени или URL" />
+        <select id="sort">
+          <option value="new">Сначала новые</option>
+          <option value="old">Сначала старые</option>
+        </select>
+        <button id="clearSearch" class="ghost">Очистить</button>
       </div>
-      <pre id="start_result" class="log-area" style="margin-top:10px;height:120px"></pre>
+
+      <div id="files" aria-live="polite"></div>
     </div>
   </section>
 
-  <!-- Middle: Runs + Branches -->
+  <!-- Middle: Runs and Logs -->
   <aside>
     <div class="card" style="margin-bottom:12px">
       <div style="font-weight:700;margin-bottom:8px">Active runs</div>
       <div class="runs-list" id="runs"></div>
     </div>
 
-    <div class="card">
-      <div style="font-weight:700;margin-bottom:8px">Branches (директории)</div>
-      <div class="small muted">Нажми Download чтобы получить ZIP с файлами ветки</div>
-      <div id="branches" class="branches"></div>
-    </div>
-  </aside>
-
-  <!-- Right: Logs -->
-  <section>
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div style="font-weight:700">Event log</div>
@@ -128,27 +167,69 @@
         <button id="btnDownloadLog" class="ghost" disabled>Скачать лог (последний)</button>
       </div>
     </div>
+  </aside>
+
+  <!-- Right: Directories, Quick actions & help -->
+  <section>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-weight:700">Branches (директории)</div>
+        <div class="small muted">Группировка файлов</div>
+      </div>
+
+      <div id="dirs" class="dir-list"><div class="small muted">Загрузка...</div></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="btnRefreshDirs" class="ghost">Обновить ветки</button>
+        <button id="btnDownloadSelected" class="ghost" disabled>Download selected</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-weight:700">Quick actions</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+        <button id="btnShowFiles" class="ghost" disabled>Показать все файлы</button>
+        <button id="btnClearOutputs" class="ghost">Очистить список (локально)</button>
+        <button id="btnStopAll" class="btn-danger" disabled>Stop all runs</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div style="font-weight:700">Help</div>
+      <div class="small muted" style="margin-top:8px">
+        • Запуск стартует краулер на сервере. <br>
+        • Каждая сохранённая страница пушится на фронт через WebSocket и отображается в Outputs. <br>
+        • Файлы группируются по веткам (branch). Нажми «Download» рядом с веткой, чтобы скачать zip. <br>
+        • Для управления требуется логин (API key).
+      </div>
+    </div>
   </section>
 </main>
 
-<footer>Crawler UI — теперь без прямых потоковых файлов (уменьшенная нагрузка).</footer>
+<footer>
+  Crawler UI — простой интерфейс. Разворачивай, тестируй, улучшай.
+</footer>
 ```
 
   </div>
 
   <div id="toast" class="toast" style="display:none"></div>
 
-  <!-- Simple login modal -->
+  <!-- Login modal (shown automatically, required) -->
 
   <div id="loginModalWrap" style="display:none">
-    <div class="modal-backdrop" id="loginBackdrop">
-      <div class="modal" role="dialog">
-        <h3>Вход</h3>
-        <div style="margin-top:8px">
-          <label>Логин <input id="loginInput" type="text" /></label>
-          <label style="margin-top:8px">Пароль <input id="passwordInput" type="password" /></label>
-          <div id="loginError" style="color:#f87171;margin-top:8px;display:none"></div>
-          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+    <div class="modal-backdrop" id="loginBackdrop" aria-hidden="false">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+        <h3 id="loginTitle">Вход (обязательно)</h3>
+        <div class="mini muted">Войдите, чтобы управлять краулером. Без входа интерфейс недоступен.</div>
+        <div style="margin-top:12px">
+          <label>Логин
+            <input id="loginInput" type="text" autocomplete="username" />
+          </label>
+          <label style="margin-top:10px">Пароль
+            <input id="passwordInput" type="password" autocomplete="current-password" />
+          </label>
+          <div class="error" id="loginError" style="display:none"></div>
+          <div class="row" style="margin-top:12px; justify-content:flex-end">
             <button id="loginCancel" class="ghost">Отмена</button>
             <button id="loginSubmit">Войти</button>
           </div>
@@ -158,164 +239,311 @@
   </div>
 
 <script>
-/* CONFIG */
-const API = '/api';
-const AUTH_API = 'https://otp-2-fos4.onrender.com';
+/* ========== CONFIG ========== */
+const API = '/api'; // local crawler backend
+const API_BASE_URL = 'https://otp-2-fos4.onrender.com'; // external auth service (provided)
 const WS_PATH = '/ws';
-let user = null; // {apiKey, name}
+const MAX_CONTENT_LEN = 20000;
+
+/* ========== STATE ========== */
 let ws = null;
-let pingInterval = null;
 let reconnectTimer = null;
-let activeRuns = {};
-let branchesList = [];
+let pingInterval = null;
+let activeRuns = {}; // run_id -> meta
+let filesIndex = new Map(); // key: relative path (branch/file)
+let filesOrder = [];
+let theme = localStorage.getItem('theme') || 'dark';
+if(theme === 'light') document.documentElement.classList.add('light'); else document.documentElement.classList.remove('light');
+document.getElementById('max_preview').innerText = MAX_CONTENT_LEN;
 
-/* UTIL */
-function toast(msg, ms=2500){ const t=document.getElementById('toast'); t.innerText=msg; t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none', ms); }
-function logEvent(obj){ const el=document.getElementById('log'); const ts=new Date().toLocaleTimeString(); el.innerText = `${ts} — ${JSON.stringify(obj)}\n` + el.innerText; }
-function defaultHeaders(){ const h={'Accept':'application/json'}; if(user && user.apiKey) h['x-api-key']=user.apiKey; return h; }
+let user = null; // {role,id,name,telegram_id,apiKey}
+let dirs = []; // branches list
+let selectedBranch = null;
 
-/* AUTH */
-function loadUser(){ try{ const raw=localStorage.getItem('crawler_user'); if(raw) user=JSON.parse(raw); }catch(e){ user=null; } updateUI(); }
-function saveUser(u){ user=u; if(u) localStorage.setItem('crawler_user', JSON.stringify(u)); else localStorage.removeItem('crawler_user'); updateUI(); }
-function updateUI(){
-  document.getElementById('userName').innerText = user && user.name ? user.name : '—';
-  const can = !!(user && user.apiKey);
-  document.getElementById('btnStart').disabled = !can;
-  document.getElementById('btnStopAll').disabled = !can;
-  document.getElementById('btnRefreshDirs').disabled = !can;
-  document.getElementById('btnRefresh').disabled = !can;
-  document.getElementById('btnDownloadLog').disabled = !can;
-  if(can){ document.getElementById('btnLogin').style.display='none'; document.getElementById('btnLogout').style.display='inline-flex'; } else { document.getElementById('btnLogin').style.display='inline-flex'; document.getElementById('btnLogout').style.display='none'; }
+/* ========== USER STORAGE & UI ========== */
+function loadUser(){
+  try{
+    const raw = localStorage.getItem('crawler_user');
+    if(raw) user = JSON.parse(raw);
+  }catch(e){ user = null; }
+  updateUserUI();
 }
-
-/* WS: only send/run/log events — DO NOT process 'saved' files to avoid heavy payloads */
-function initWS(){
-  if(!user || !user.apiKey) return;
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const uri = `${proto}//${location.host}${WS_PATH}?key=${encodeURIComponent(user.apiKey)}`;
-  ws = new WebSocket(uri);
-  document.getElementById('ws_status').innerText = 'connecting';
-  ws.onopen = ()=>{ document.getElementById('ws_status').innerText='connected'; toast('WS connected'); startPing(); };
-  ws.onmessage = (ev)=> {
-    let msg=null;
-    try{ msg=JSON.parse(ev.data); }catch(e){ return; }
-    // Important: ignore heavy 'saved' payloads — show only light events/logs
-    const t = msg.type || msg.event || 'event';
-    if(t === 'saved'){
-      // Instead of adding full file to UI, convert to a compact log entry + ensure branch is known
-      logEvent({event:'file_saved', file: msg.file, branch: msg.branch, url: msg.url});
-      if(msg.branch) { ensureBranchKnown(msg.branch); }
-      return;
-    }
-    // Accept run lifecycle events and status messages
-    if(t === 'started' || t === 'run_started'){
-      activeRuns[msg.run_id] = { start_url: msg.start_url || '', ts: Date.now() };
-      renderRuns();
-      logEvent({event:'run_started', run: msg.run_id});
-      return;
-    }
-    if(t === 'finished' || t === 'stopped_all' || t === 'stopping'){
-      // broadcast as log
-      logEvent(msg);
-      if(t === 'stopped_all' && msg.runs){ msg.runs.forEach(r=> delete activeRuns[r]); renderRuns(); }
-      return;
-    }
-    // generic fallback: append to logs
-    logEvent(msg);
-  };
-  ws.onclose = ()=>{ document.getElementById('ws_status').innerText='disconnected'; toast('WS closed — reconnecting'); scheduleReconnect(); };
-  ws.onerror = (e)=>{ document.getElementById('ws_status').innerText='error'; console.warn('ws err', e); };
+function saveUser(u){
+  user = u;
+  if(u) localStorage.setItem('crawler_user', JSON.stringify(u)); else localStorage.removeItem('crawler_user');
+  updateUserUI();
 }
-function startPing(){ if(pingInterval) clearInterval(pingInterval); pingInterval=setInterval(()=>{ try{ ws && ws.send('ping'); }catch(e){} },20000); }
-function stopWS(){ try{ if(pingInterval) clearInterval(pingInterval); pingInterval=null; if(ws){ ws.close(); ws=null; } document.getElementById('ws_status').innerText='stopped'; }catch(e){} }
-function scheduleReconnect(){ if(reconnectTimer) return; reconnectTimer=setTimeout(()=>{ reconnectTimer=null; if(user && user.apiKey) initWS(); },3000); }
+function updateUserUI(){
+  const userName = document.getElementById('userName');
+  const btnLogin = document.getElementById('btnLogin');
+  const btnLogout = document.getElementById('btnLogout');
+  const startBtn = document.getElementById('btnStart');
+  const startBG = document.getElementById('btnStartBG');
+  const listBtn = document.getElementById('btnList');
+  const refreshBtn = document.getElementById('btnRefresh');
+  const showFilesBtn = document.getElementById('btnShowFiles');
+  const stopAllBtn = document.getElementById('btnStopAll');
+  const downloadLogBtn = document.getElementById('btnDownloadLog');
 
-/* RUNS UI */
-function renderRuns(){
-  const el=document.getElementById('runs'); el.innerHTML='';
-  const keys=Object.keys(activeRuns).reverse();
-  if(keys.length===0){ el.innerHTML='<div class="small muted">Нет активных запусков</div>'; return; }
-  keys.forEach(id=>{
-    const r=activeRuns[id]||{};
-    const div=document.createElement('div'); div.className='run-item';
-    const left=document.createElement('div'); left.innerHTML=`<div style="font-weight:700">${id}</div><div class="small muted">${escapeHtml(r.start_url||'')}</div>`;
-    const right=document.createElement('div');
-    const btnStop=document.createElement('button'); btnStop.innerText='Stop'; btnStop.onclick=()=> stopRun(id);
-    const btnLogs=document.createElement('button'); btnLogs.className='ghost'; btnLogs.innerText='Logs'; btnLogs.onclick=()=> downloadRunLog(id);
-    right.appendChild(btnLogs); right.appendChild(btnStop);
-    div.appendChild(left); div.appendChild(right); el.appendChild(div);
-  });
-}
-
-/* BRANCHES */
-function renderBranches(){
-  const el=document.getElementById('branches'); el.innerHTML='';
-  if(branchesList.length===0){ el.innerHTML='<div class="small muted">Нет веток (деректорий)</div>'; return; }
-  branchesList.forEach(b=>{
-    const div=document.createElement('div'); div.className='branch-item';
-    const left=document.createElement('div'); left.innerHTML=`<div class="branch-name">${escapeHtml(b.branch)}</div><div class="small muted">${b.files} files • ${Math.round(b.size/1024)} KB</div>`;
-    const right=document.createElement('div');
-    const btnDownload=document.createElement('button'); btnDownload.className='ghost'; btnDownload.innerText='Download'; btnDownload.onclick=()=> { window.open(`${API}/download_dir/${encodeURIComponent(b.branch)}`, '_blank'); };
-    const btnShowFiles=document.createElement('button'); btnShowFiles.className='ghost'; btnShowFiles.innerText='Show files'; btnShowFiles.onclick=()=> showFilesInBranch(b.branch);
-    right.appendChild(btnShowFiles); right.appendChild(btnDownload);
-    div.appendChild(left); div.appendChild(right);
-    el.appendChild(div);
-  });
-  // fill branch filter select
-  const sel=document.getElementById('branch_filter');
-  if(sel){
-    sel.innerHTML = '<option value="">🗂 Все ветки</option>';
-    branchesList.forEach(b=> sel.appendChild(new Option(b.branch, b.branch)));
+  if(user && user.name){
+    userName.innerText = user.name + (user.role ? ` (${user.role})` : '');
+    btnLogin.style.display = 'none';
+    btnLogout.style.display = 'inline-flex';
+    // enable actions
+    startBtn.disabled = false;
+    startBG.disabled = false;
+    listBtn.disabled = false;
+    refreshBtn.disabled = false;
+    showFilesBtn.disabled = false;
+    stopAllBtn.disabled = false;
+    downloadLogBtn.disabled = false;
+    document.getElementById('btnDownloadSelected').disabled = !selectedBranch;
+  } else {
+    userName.innerText = '—';
+    btnLogin.style.display = 'inline-flex';
+    btnLogout.style.display = 'none';
+    // disable actions
+    startBtn.disabled = true;
+    startBG.disabled = true;
+    listBtn.disabled = true;
+    refreshBtn.disabled = true;
+    showFilesBtn.disabled = true;
+    stopAllBtn.disabled = true;
+    downloadLogBtn.disabled = true;
+    document.getElementById('btnDownloadSelected').disabled = true;
   }
 }
 
-function ensureBranchKnown(branch){
-  if(!branch) return;
-  if(branchesList.find(x=>x.branch === branch)) return;
-  // if unknown, refresh branch list from server (cheap)
-  fetchBranches();
+/* ========== HELPERS ========== */
+function toast(text, ms=3000){
+  const t = document.getElementById('toast');
+  t.innerText = text;
+  t.style.display = 'block';
+  clearTimeout(t._h);
+  t._h = setTimeout(()=> t.style.display='none', ms);
+}
+function logEvent(obj){
+  const el = document.getElementById('log');
+  const ts = (new Date()).toLocaleTimeString();
+  el.innerText = `${ts} — ${JSON.stringify(obj)}\n` + el.innerText;
+}
+function escapeHtml(s){
+  if(!s) return '';
+  return s.replace(/[&<>"'`]/g, (m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[m]));
+}
+function encodeName(n){ return encodeURIComponent(n); }
+
+function defaultHeaders(){
+  const headers = { 'Accept': 'application/json' };
+  if(user && user.apiKey){
+    headers['x-api-key'] = user.apiKey;
+  }
+  return headers;
 }
 
-/* API ACTIONS */
-async function fetchBranches(){
-  if(!user){ toast('Вход обязателен'); return; }
+/* ========== WS (only after login) ========== */
+function initWS(){
+  if(!user || !user.apiKey){
+    console.warn('WS init attempted without user apiKey');
+    return;
+  }
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  // pass apiKey in query param because browser WebSocket cannot set custom headers
+  const uri = `${proto}//${location.host}${WS_PATH}?key=${encodeURIComponent(user.apiKey)}`;
+  ws = new WebSocket(uri);
+  updateWsStatus('connecting');
+  ws.onopen = () => { updateWsStatus('connected'); toast('WS connected'); startPing(); };
+  ws.onmessage = (ev) => {
+    let msg = null;
+    try { msg = JSON.parse(ev.data); } catch(e){ return; }
+    handleWsMessage(msg);
+  };
+  ws.onclose = () => { updateWsStatus('disconnected'); toast('WS disconnected — reconnecting'); scheduleReconnect(); };
+  ws.onerror = (e) => { updateWsStatus('error'); console.warn('ws error', e); };
+}
+function scheduleReconnect(){ if(reconnectTimer) return; reconnectTimer = setTimeout(()=>{ reconnectTimer=null; if(user && user.apiKey) initWS(); }, 3000); }
+function updateWsStatus(s){ const el = document.getElementById('ws_status'); el.innerText = s; }
+function startPing(){ if(pingInterval) clearInterval(pingInterval); pingInterval = setInterval(()=>{ try{ ws && ws.send('ping'); }catch(e){} }, 20000); }
+function stopWS(){ try{ if(pingInterval) clearInterval(pingInterval); pingInterval=null; if(ws){ ws.close(); ws=null; } updateWsStatus('stopped'); }catch(e){} }
+
+/* ========== WS message handling ========== */
+function handleWsMessage(msg){
+  const type = msg.type || msg.event || 'event';
+  if(type === 'saved'){
+    // server now sends branch field; ensure file key uses branch prefix
+    // msg.file may be 'branch/fname.json' or just fname depending on server; keep it as-is
+    addOrUpdateFile(msg);
+    logEvent({event:'saved', file: msg.file, run: msg.run_id, branch: msg.branch});
+  } else if(type === 'run_started' || type === 'started'){
+    activeRuns[msg.run_id] = { start_url: msg.start_url || msg.start_url, ts: Date.now() };
+    renderRuns();
+    logEvent({event:'run_started', run: msg.run_id});
+  } else if(type === 'stopping'){
+    logEvent({event:'stopping', run: msg.run_id});
+  } else if(type === 'finished'){
+    logEvent({event:'finished', run: msg.run_id});
+    if(activeRuns[msg.run_id]) activeRuns[msg.run_id].finished = true;
+    renderRuns();
+  } else if(type === 'stopped_all'){
+    logEvent({event:'stopped_all', runs: msg.runs || []});
+    activeRuns = {};
+    renderRuns();
+  } else {
+    logEvent(msg);
+  }
+}
+
+/* ========== Files UI ========== */
+function addOrUpdateFile(item){
+  const name = item.file;
+  if(!name) return;
+  const now = Date.now();
+  const entry = {
+    name,
+    url: item.url || '',
+    title: item.title || '',
+    content: item.content || '',
+    branch: item.branch || (name.includes('/') ? name.split('/').slice(0,-1).join('/') : ''),
+    run_id: item.run_id || '',
+    ts: now
+  };
+  filesIndex.set(name, entry);
+  filesOrder = Array.from(filesIndex.keys()).sort((a,b)=> filesIndex.get(b).ts - filesIndex.get(a).ts );
+  renderFiles();
+}
+
+async function refreshFiles(){
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
+  try{
+    const res = await fetch(`${API}/list`, { headers: defaultHeaders() });
+    if(!res.ok) throw new Error('list failed');
+    const data = await res.json();
+    (data.files || []).forEach(f=>{
+      if(!filesIndex.has(f.name)){
+        filesIndex.set(f.name, { name: f.name, title:'', url:'', content:'', size: f.size || 0, ts: Date.now(), branch: f.name.includes('/') ? f.name.split('/').slice(0,-1).join('/') : '' });
+      }
+    });
+    filesOrder = Array.from(filesIndex.keys()).sort((a,b)=> filesIndex.get(b).ts - filesIndex.get(a).ts);
+    renderFiles();
+  }catch(e){
+    console.warn('refreshFiles', e);
+    toast('Не удалось загрузить список файлов');
+  }
+}
+
+function renderFiles(){
+  const container = document.getElementById('files');
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const sort = document.getElementById('sort').value;
+  container.innerHTML = '';
+  let list = Array.from(filesIndex.values());
+  if(q){
+    list = list.filter(it => (it.name && it.name.toLowerCase().includes(q)) || (it.url && it.url.toLowerCase().includes(q)) || (it.title && it.title.toLowerCase().includes(q)));
+  }
+  if(sort === 'new') list.sort((a,b)=> b.ts - a.ts); else list.sort((a,b)=> a.ts - b.ts);
+  for(const it of list){
+    const div = document.createElement('div'); div.className = 'file-item';
+    const meta = document.createElement('div'); meta.className = 'file-meta';
+    const actions = document.createElement('div'); actions.className = 'file-actions';
+    meta.innerHTML = `<div class="fname">${escapeHtml(it.name)}</div>
+                      <div class="ftitle">${escapeHtml(it.title || '')}</div>
+                      <div class="small muted">Source: <a href="${escapeHtml(it.url||'#')}" target="_blank">${escapeHtml(it.url||'')}</a></div>
+                      <div class="small muted">Branch: ${escapeHtml(it.branch || '')}</div>`;
+    if(it.content){
+      const pre = document.createElement('pre');
+      pre.className = 'preview';
+      pre.innerText = it.content;
+      meta.appendChild(pre);
+    }
+    const a = document.createElement('a'); a.href = `${API}/output/${encodeName(it.name)}`; a.target='_blank'; a.innerText='Download'; a.className='ghost';
+    const btnCopy = document.createElement('button'); btnCopy.innerText='Copy'; btnCopy.className='ghost';
+    btnCopy.onclick = ()=>{ navigator.clipboard.writeText(it.content || '').then(()=> toast('Copied')); };
+    const btnShowLog = document.createElement('button'); btnShowLog.innerText='Log'; btnShowLog.className='ghost';
+    btnShowLog.onclick = ()=> fetchLogForFile(it.name);
+    actions.appendChild(a); actions.appendChild(btnCopy); actions.appendChild(btnShowLog);
+    div.appendChild(meta); div.appendChild(actions);
+    container.appendChild(div);
+  }
+}
+
+/* ========== Directories (branches) UI ========== */
+async function loadDirs(){
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   try{
     const res = await fetch(`${API}/dirs`, { headers: defaultHeaders() });
     if(!res.ok) throw new Error('dirs failed');
     const data = await res.json();
-    branchesList = data.dirs || [];
-    renderBranches();
-  }catch(e){ console.warn(e); toast('Не удалось загрузить ветки'); }
-}
-
-async function showFilesInBranch(branch){
-  if(!user){ toast('Вход обязателен'); return; }
-  try{
-    const res = await fetch(`${API}/dir/${encodeURIComponent(branch)}/files`, { headers: defaultHeaders() });
-    if(!res.ok) throw new Error('failed');
-    const data = await res.json();
-    // show lightweight file list in a modal (no heavy content transfer)
-    const files = data.files || [];
-    const list = files.map(f => `${f.name} (${Math.round(f.size/1024)} KB)`).join('\n');
-    alert(`Files in ${branch}:\n\n` + (list || '(пусто)'));
+    dirs = data.dirs || [];
+    renderDirs();
   }catch(e){
-    console.warn(e);
-    toast('Не удалось получить файлы ветки');
+    console.warn('loadDirs', e);
+    document.getElementById('dirs').innerHTML = '<div class="small muted">Ошибка загрузки веток</div>';
   }
 }
 
-/* START/STOP */
-async function startCrawl(){
-  if(!user){ toast('Вход обязателен'); return; }
+function renderDirs(){
+  const el = document.getElementById('dirs');
+  el.innerHTML = '';
+  if(!dirs || dirs.length === 0){
+    el.innerHTML = '<div class="small muted">Нет веток</div>';
+    return;
+  }
+  dirs.forEach(d=>{
+    const div = document.createElement('div'); div.className='dir-item';
+    const left = document.createElement('div');
+    left.innerHTML = `<div style="font-weight:700">${escapeHtml(d.branch)}</div><div class="dir-meta">${d.files} file(s) • ${Math.round(d.size/1024)} KB</div>`;
+    const right = document.createElement('div');
+    const btnDownload = document.createElement('button'); btnDownload.className='ghost'; btnDownload.innerText='Download zip';
+    btnDownload.onclick = ()=> { window.open(`${API}/download_dir/${encodeName(d.branch)}`, '_blank'); };
+    const btnSelect = document.createElement('button'); btnSelect.className='ghost'; btnSelect.innerText='Select';
+    btnSelect.onclick = ()=> { selectBranch(d.branch); };
+    right.appendChild(btnSelect); right.appendChild(btnDownload);
+    div.appendChild(left); div.appendChild(right);
+    el.appendChild(div);
+  });
+}
+
+function selectBranch(branch){
+  selectedBranch = branch;
+  document.getElementById('btnDownloadSelected').disabled = false;
+  document.getElementById('btnDownloadSelected').onclick = ()=> { window.open(`${API}/download_dir/${encodeName(branch)}`, '_blank'); };
+  toast('Selected: ' + branch, 1500);
+}
+
+/* ========== Runs UI ========== */
+function renderRuns(){
+  const el = document.getElementById('runs');
+  el.innerHTML = '';
+  const keys = Object.keys(activeRuns).reverse();
+  if(keys.length === 0) el.innerHTML = '<div class="small muted">Нет активных запусков</div>';
+  keys.forEach(id=>{
+    const r = activeRuns[id];
+    const div = document.createElement('div'); div.className='run-item';
+    const left = document.createElement('div'); left.innerHTML = `<div style="font-weight:700">${escapeHtml(id)}</div><div class="small muted">${escapeHtml(r.start_url||'')}</div>`;
+    const right = document.createElement('div');
+    const btnStop = document.createElement('button'); btnStop.innerText='Stop'; btnStop.onclick = ()=> stopRun(id);
+    const btnLogs = document.createElement('button'); btnLogs.className='ghost'; btnLogs.innerText='Logs'; btnLogs.onclick = ()=> downloadRunLog(id);
+    right.appendChild(btnLogs); right.appendChild(btnStop);
+    div.appendChild(left); div.appendChild(right);
+    el.appendChild(div);
+  });
+}
+
+/* ========== API actions ========== */
+async function startCrawl(bg=false){
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   const start_url = document.getElementById('start_url').value.trim();
   if(!start_url) return alert('Укажи start_url');
   const prefix = document.getElementById('prefix').value || null;
   const concurrency = parseInt(document.getElementById('concurrency').value||'5',10);
   const save_html = document.getElementById('save_html').checked;
-  const body = { start_url, prefix, concurrency, save_html };
+  const body = { start_url, prefix, concurrency, save_html, bg };
   try{
     const res = await fetch(`${API}/start`, { method:'POST', headers: Object.assign({'Content-Type':'application/json'}, defaultHeaders()), body: JSON.stringify(body) });
-    if(!res.ok) throw new Error('start failed');
+    if(!res.ok) {
+      const txt = await res.text().catch(()=>null);
+      throw new Error(txt || 'start failed');
+    }
     const data = await res.json();
     document.getElementById('start_result').innerText = JSON.stringify(data, null, 2);
     if(data.run_id){
@@ -328,87 +556,200 @@ async function startCrawl(){
 }
 
 async function stopRun(run_id){
-  if(!user){ toast('Вход обязателен'); return; }
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   if(!confirm('Остановить run ' + run_id + '?')) return;
   try{
     const res = await fetch(`${API}/stop/${encodeURIComponent(run_id)}`, { method:'POST', headers: defaultHeaders() });
-    if(res.ok){ toast('Stopping ' + run_id); delete activeRuns[run_id]; renderRuns(); } else toast('Stop failed');
-  }catch(e){ toast('Stop error'); }
+    if(res.ok){
+      toast('Stopping ' + run_id);
+      delete activeRuns[run_id];
+      renderRuns();
+    } else {
+      toast('Stop failed');
+    }
+  } catch(e){ toast('Stop error'); }
 }
 
 async function stopAll(){
-  if(!user){ toast('Вход обязателен'); return; }
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   if(!confirm('Stop all runs?')) return;
-  try{
-    const res = await fetch(`${API}/stop_all`, { method:'POST', headers: defaultHeaders() });
-    if(res.ok){ const data=await res.json(); toast('Stopped: '+ (data.stopped||[]).join(', ')); activeRuns={}; renderRuns(); } else toast('Stop all failed');
-  }catch(e){ toast('Stop all error'); }
+  try {
+    const res = await fetch(`${API}/stop_all`, { method: 'POST', headers: defaultHeaders() });
+    if(res.ok){
+      toast('Stopped all runs');
+      activeRuns = {};
+      renderRuns();
+    } else {
+      toast('Stop all failed');
+    }
+  } catch(e){
+    console.error('stopAll', e);
+    toast('Stop all error');
+  }
 }
 
-/* LOGS */
-document.getElementById('btnClearLog').onclick = ()=> { document.getElementById('log').innerText=''; };
-document.getElementById('btnRefreshDirs').onclick = ()=> fetchBranches();
-document.getElementById('btnRefresh').onclick = ()=> fetchBranches();
-document.getElementById('btnStart').onclick = ()=> startCrawl();
-document.getElementById('btnStopAll').onclick = ()=> stopAll();
-
-/* LOGIN handling (simple handoff to external auth) */
-function showLogin(open=true){ document.getElementById('loginModalWrap').style.display = open ? 'block' : 'none'; }
-document.getElementById('btnLogin').onclick = ()=> showLogin(true);
-document.getElementById('loginCancel').onclick = ()=> showLogin(false);
-document.getElementById('loginSubmit').onclick = async ()=> {
-  const login = document.getElementById('loginInput').value.trim();
-  const password = document.getElementById('passwordInput').value.trim();
-  if(!login||!password){ document.getElementById('loginError').innerText='Введите логин и пароль'; document.getElementById('loginError').style.display='block'; return; }
-  const submit=document.getElementById('loginSubmit'); submit.disabled=true; submit.innerText='Вхожу...';
-  try{
-    const resp = await fetch(`${AUTH_API}/api/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ login, password })});
-    if(!resp.ok) throw new Error('auth failed');
-    const data = await resp.json();
-    if(data.status==='success' && (data.apiKey||data.api_key)){
-      const newUser = { name: data.name||login, apiKey: data.apiKey||data.api_key };
-      saveUser(newUser);
-      showLogin(false);
-      initWS();
-      fetchBranches();
-      toast('Logged in');
-    } else { throw new Error('auth error'); }
-  }catch(e){ console.error(e); document.getElementById('loginError').innerText = 'Ошибка входа'; document.getElementById('loginError').style.display='block'; }
-  finally{ submit.disabled=false; submit.innerText='Войти'; }
-};
-document.getElementById('btnLogout').onclick = ()=> { if(!confirm('Выйти?')) return; stopWS(); saveUser(null); };
-
-/* init */
-function escapeHtml(s){ if(!s) return ''; return s.replace(/[&<>"'`]/g, (m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[m])); }
-
-function loadInit(){
-  try{ const raw=localStorage.getItem('crawler_user'); if(raw) user=JSON.parse(raw); }catch(e){ user=null; }
-  updateUI();
-  if(user && user.apiKey){ initWS(); fetchBranches(); }
-  else showLogin(true);
-}
-loadInit();
-
-/* Helper functions used by UI actions */
-function downloadRunLog(run_id){
-  const url = `${API}/logs/${encodeURIComponent(run_id)}`;
-  window.open(url, '_blank');
-}
-async function fetchAndShowLatestLog(){
+async function fetchLogForFile(fname){
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
+  toast('Fetching log...');
   try{
     const res = await fetch(`${API}/list`, { headers: defaultHeaders() });
     const data = await res.json();
-    const logs = (data.files || []).filter(f=>f.name.endsWith('.log'));
-    if(!logs.length) return toast('No logs');
+    const logs = (data.files || []).filter(f => f.name.endsWith('.log'));
+    if(logs.length === 0){ toast('No logs found'); return; }
+    const latest = logs[logs.length-1].name;
+    const run_id = latest.replace('.log','');
+    downloadRunLog(run_id);
+  }catch(e){ console.warn(e); toast('Log fetch failed'); }
+}
+
+function downloadRunLog(run_id){
+  const url = `${API}/logs/${encodeName(run_id)}`;
+  window.open(url, '_blank');
+}
+
+/* ========== Login logic (adapted) ========== */
+function showLoginModal(open = true){
+  document.getElementById('loginModalWrap').style.display = open ? 'block' : 'none';
+  if(open){
+    document.getElementById('loginInput').focus();
+    document.getElementById('appRoot').setAttribute('aria-hidden', 'true');
+  } else {
+    document.getElementById('loginError').style.display = 'none';
+    document.getElementById('loginInput').value = '';
+    document.getElementById('passwordInput').value = '';
+    document.getElementById('appRoot').setAttribute('aria-hidden', 'false');
+  }
+}
+
+async function handleLogin(){
+  const login = document.getElementById('loginInput').value || '';
+  const password = document.getElementById('passwordInput').value || '';
+  const errEl = document.getElementById('loginError');
+  if(!login.trim() || !password.trim()){
+    errEl.innerText = 'Пожалуйста, введите логин и пароль';
+    errEl.style.display = 'block';
+    setTimeout(()=> { errEl.style.display = 'none'; }, 5000);
+    return;
+  }
+  const submitBtn = document.getElementById('loginSubmit');
+  submitBtn.disabled = true;
+  submitBtn.innerText = 'Вхожу...';
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login: login.trim(), password: password.trim() })
+    });
+    if(!response.ok){
+      const text = await response.text().catch(()=>null);
+      throw { network: true, status: response.status, text };
+    }
+    const data = await response.json();
+    if (data.status === 'success') {
+      const newUser = {
+        role: data.role || null,
+        id: data.id || null,
+        name: data.name || login.trim(),
+        telegram_id: data.telegram_id || null,
+        apiKey: data.apiKey || data.api_key || null
+      };
+      if(!newUser.apiKey){
+        throw new Error('API key not returned by auth server');
+      }
+      saveUser(newUser);
+      showLoginModal(false);
+      toast('Logged in successfully', 2500);
+      // after login, init WS and load files/dirs
+      initWS();
+      await refreshFiles();
+      await loadDirs();
+    } else {
+      errEl.innerText = 'Неправильный логин или пароль';
+      errEl.style.display = 'block';
+      setTimeout(()=> { errEl.style.display = 'none'; }, 5000);
+    }
+  } catch (err) {
+    console.error('Login error:', err);
+    const errElText = (err && err.text) ? (err.text || 'Ошибка сети') : (err?.message || 'Ошибка сети');
+    document.getElementById('loginError').innerText = errElText;
+    document.getElementById('loginError').style.display = 'block';
+    setTimeout(()=> { document.getElementById('loginError').style.display = 'none'; }, 5000);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerText = 'Войти';
+  }
+}
+
+function handleLogout(){
+  if(!confirm('Выйти?')) return;
+  stopWS();
+  saveUser(null);
+  filesIndex.clear();
+  filesOrder=[];
+  renderFiles();
+  activeRuns = {};
+  renderRuns();
+  dirs = [];
+  renderDirs();
+  toast('Logged out', 1500);
+  setTimeout(()=> showLoginModal(true), 200);
+}
+
+/* ========== UI wiring ========== */
+document.getElementById('btnStart').onclick = ()=> startCrawl(false);
+document.getElementById('btnStartBG').onclick = ()=> startCrawl(true);
+document.getElementById('btnList').onclick = ()=> refreshFiles();
+document.getElementById('btnRefresh').onclick = ()=> { if(!user){ showLoginModal(true); toast('Вход обязателен'); return; } refreshFiles(); loadDirs(); toast('Refreshed'); };
+document.getElementById('clearSearch').onclick = ()=> { document.getElementById('q').value=''; renderFiles(); };
+document.getElementById('q').oninput = ()=> renderFiles();
+document.getElementById('sort').onchange = ()=> renderFiles();
+document.getElementById('btnClearLog').onclick = ()=> { document.getElementById('log').innerText=''; };
+document.getElementById('btnDownloadLog').onclick = async ()=> {
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
+  try{
+    const res = await fetch(`${API}/list`, { headers: defaultHeaders() });
+    const data = await res.json();
+    const logs = (data.files||[]).filter(f=>f.name.endsWith('.log'));
+    if(logs.length===0){ toast('No logs'); return; }
     const latest = logs[logs.length-1].name.replace('.log','');
     downloadRunLog(latest);
-  }catch(e){ toast('Cannot fetch logs'); }
+  }catch(e){ toast('err'); }
+};
+document.getElementById('btnShowFiles').onclick = ()=> {
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
+  refreshFiles();
+};
+document.getElementById('btnClearOutputs').onclick = ()=> { filesIndex.clear(); filesOrder=[]; renderFiles(); toast('Cleared local list'); };
+document.getElementById('btnStopAll').onclick = ()=> { if(!user){ showLoginModal(true); toast('Вход обязателен'); return; } stopAll(); };
+document.getElementById('toggleTheme').onclick = ()=> {
+  if(document.documentElement.classList.contains('light')){ document.documentElement.classList.remove('light'); localStorage.setItem('theme','dark'); } else { document.documentElement.classList.add('light'); localStorage.setItem('theme','light'); }
+};
+document.getElementById('btnRefreshDirs').onclick = ()=> loadDirs();
+document.getElementById('btnDownloadSelected').onclick = ()=> { if(selectedBranch) window.open(`${API}/download_dir/${encodeName(selectedBranch)}`, '_blank'); };
+
+/* Login buttons */
+document.getElementById('btnLogin').onclick = ()=> showLoginModal(true);
+document.getElementById('loginCancel').onclick = ()=> showLoginModal(false);
+document.getElementById('loginSubmit').onclick = ()=> handleLogin();
+document.getElementById('btnLogout').onclick = ()=> handleLogout();
+
+/* close modal on backdrop click */
+document.getElementById('loginBackdrop').onclick = (e)=> {
+  if(e.target === document.getElementById('loginBackdrop')) {
+    if(user) showLoginModal(false);
+  }
+};
+
+/* ========== Init: require login on load ========== */
+loadUser();
+if(user && user.apiKey){
+  initWS();
+  refreshFiles();
+  loadDirs();
+} else {
+  showLoginModal(true);
+  updateUserUI();
 }
-document.getElementById('btnDownloadLog').onclick = fetchAndShowLatestLog;
-
-/* Expose some useful shortcuts for testing in console */
-window.__crawler = { fetchBranches, showFilesInBranch, stopAll };
-
 </script>
 
 </body>
