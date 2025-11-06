@@ -1,5 +1,4 @@
 <!doctype html>
-
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
@@ -31,6 +30,7 @@
     input[type="checkbox"]{transform:scale(1.1); margin-right:6px}
     button { background:linear-gradient(90deg,var(--accent),var(--accent-2)); border:none; color:white; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:600 }
     button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06); color:var(--text); font-weight:600}
+    button.plain{background:transparent;border:none;color:var(--accent);padding:6px 8px;border-radius:8px}
     button:disabled, .ghost[disabled]{opacity:0.45;cursor:not-allowed}
     .row{display:flex;gap:10px;align-items:center}
     .small{font-size:13px;color:var(--muted)}
@@ -61,9 +61,12 @@
     .modal .error{color:#f87171;margin-top:8px}
     .modal .row{margin-top:10px}
     .mini{font-size:12px;color:var(--muted)}
+    .preview-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:120;max-width:90%;width:900px;max-height:86vh;overflow:auto}
+    .preview-content{background:var(--card);padding:16px;border-radius:12px;border:1px solid rgba(255,255,255,0.04)}
     @media (max-width:980px){
       .cols-3{grid-template-columns: 1fr}
       .modal{width:92%}
+      .preview-modal{width:92%}
     }
   </style>
 </head>
@@ -86,7 +89,6 @@
       </div>
     </header>
 
-```
 <main class="grid cols-3" style="align-items:start">
   <!-- Left: Start form + Outputs -->
   <section>
@@ -206,16 +208,13 @@
 </main>
 
 <footer>
-  Crawler UI — простой интерфейс. Разворачивай, тестируй, улучшай.
+  Crawler UI — оптимизированный интерфейс. Разворачивай, тестируй, улучшай.
 </footer>
-```
-
   </div>
 
   <div id="toast" class="toast" style="display:none"></div>
 
   <!-- Login modal (shown automatically, required) -->
-
   <div id="loginModalWrap" style="display:none">
     <div class="modal-backdrop" id="loginBackdrop" aria-hidden="false">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
@@ -238,23 +237,40 @@
     </div>
   </div>
 
+  <!-- Preview modal -->
+  <div id="previewModal" class="preview-modal" style="display:none">
+    <div class="preview-content card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div id="previewTitle" style="font-weight:700">Preview</div>
+        <div>
+          <button id="previewDownload" class="plain">Download</button>
+          <button id="previewClose" class="ghost">Close</button>
+        </div>
+      </div>
+      <pre id="previewBody" style="white-space:pre-wrap;max-height:70vh;overflow:auto;font-family:monospace"></pre>
+    </div>
+  </div>
+
 <script>
 /* ========== CONFIG ========== */
-const API = '/api'; // local crawler backend
+const API = '/api'; // local crawler backend (expects /list, /start, /stop/:id, /output/:name, /dirs, /download_dir/:branch, /logs/:id)
 const API_BASE_URL = 'https://otp-2-fos4.onrender.com'; // external auth service (provided)
 const WS_PATH = '/ws';
-const MAX_CONTENT_LEN = 20000;
+const MAX_CONTENT_LEN = 20000; // when showing full content in UI, trim to this
+const PREVIEW_LEN = 2000; // how many chars of content kept as preview on client
+const FILE_BATCH_MS = 250; // batching window for incoming WS saved events
+const MAX_LOG_CHARS = 200000; // limit log size in UI
 
 /* ========== STATE ========== */
 let ws = null;
 let reconnectTimer = null;
 let pingInterval = null;
 let activeRuns = {}; // run_id -> meta
-let filesIndex = new Map(); // key: relative path (branch/file)
+let filesIndex = new Map(); // key: relative path (branch/file) -> {name, title, url, content_preview, branch, size, ts}
 let filesOrder = [];
 let theme = localStorage.getItem('theme') || 'dark';
 if(theme === 'light') document.documentElement.classList.add('light'); else document.documentElement.classList.remove('light');
-document.getElementById('max_preview').innerText = MAX_CONTENT_LEN;
+document.getElementById('max_preview').innerText = PREVIEW_LEN;
 
 let user = null; // {role,id,name,telegram_id,apiKey}
 let dirs = []; // branches list
@@ -270,7 +286,13 @@ function loadUser(){
 }
 function saveUser(u){
   user = u;
-  if(u) localStorage.setItem('crawler_user', JSON.stringify(u)); else localStorage.removeItem('crawler_user');
+  if(u) {
+    // keep only small user object — do not store large data
+    const safe = { role: u.role || null, id: u.id || null, name: u.name || null, telegram_id: u.telegram_id || null, apiKey: u.apiKey || null };
+    localStorage.setItem('crawler_user', JSON.stringify(safe));
+  } else {
+    localStorage.removeItem('crawler_user');
+  }
   updateUserUI();
 }
 function updateUserUI(){
@@ -325,7 +347,11 @@ function toast(text, ms=3000){
 function logEvent(obj){
   const el = document.getElementById('log');
   const ts = (new Date()).toLocaleTimeString();
-  el.innerText = `${ts} — ${JSON.stringify(obj)}\n` + el.innerText;
+  const line = `${ts} — ${JSON.stringify(obj)}\n`;
+  el.innerText = line + el.innerText;
+  if(el.innerText.length > MAX_LOG_CHARS){
+    el.innerText = el.innerText.slice(0, MAX_LOG_CHARS);
+  }
 }
 function escapeHtml(s){
   if(!s) return '';
@@ -341,38 +367,98 @@ function defaultHeaders(){
   return headers;
 }
 
+/* ========== Batching for WS file updates ========== */
+let fileUpdateBuffer = [];
+let fileRenderTimer = null;
+
+function queueFileUpdate(item){
+  // keep only necessary pieces of item to avoid memory bloat
+  const slim = {
+    file: item.file,
+    url: item.url || '',
+    title: item.title || '',
+    content: item.content ? (item.content.slice(0, PREVIEW_LEN)) : '',
+    branch: item.branch || (item.file && item.file.includes('/') ? item.file.split('/').slice(0,-1).join('/') : ''),
+    run_id: item.run_id || ''
+  };
+  fileUpdateBuffer.push(slim);
+  if(fileRenderTimer) return;
+  fileRenderTimer = setTimeout(()=> {
+    for(const it of fileUpdateBuffer) addOrUpdateFileImmediate(it);
+    fileUpdateBuffer = [];
+    fileRenderTimer = null;
+    // render once after applying batch
+    renderFiles();
+  }, FILE_BATCH_MS);
+}
+
+/* immediate add/update used by the batcher */
+function addOrUpdateFileImmediate(item){
+  const name = item.file;
+  if(!name) return;
+  const now = Date.now();
+  const entry = {
+    name,
+    url: item.url || '',
+    title: item.title || '',
+    content_preview: (item.content || '').slice(0, PREVIEW_LEN),
+    branch: item.branch || (name.includes('/') ? name.split('/').slice(0,-1).join('/') : ''),
+    run_id: item.run_id || '',
+    ts: now
+  };
+  filesIndex.set(name, entry);
+  filesOrder = Array.from(filesIndex.keys()).sort((a,b)=> filesIndex.get(b).ts - filesIndex.get(a).ts );
+}
+
 /* ========== WS (only after login) ========== */
+let wsTrafficBytes = 0;
 function initWS(){
   if(!user || !user.apiKey){
     console.warn('WS init attempted without user apiKey');
     return;
   }
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  // pass apiKey in query param because browser WebSocket cannot set custom headers
   const uri = `${proto}//${location.host}${WS_PATH}?key=${encodeURIComponent(user.apiKey)}`;
   ws = new WebSocket(uri);
   updateWsStatus('connecting');
-  ws.onopen = () => { updateWsStatus('connected'); toast('WS connected'); startPing(); };
+  ws.onopen = () => { updateWsStatus('connected'); toast('WS connected'); startPing(); startTrafficMonitor(); };
   ws.onmessage = (ev) => {
+    // measure traffic
+    try {
+      if(typeof ev.data === 'string') wsTrafficBytes += ev.data.length;
+      else if(ev.data instanceof ArrayBuffer) wsTrafficBytes += ev.data.byteLength;
+    } catch(e){}
     let msg = null;
-    try { msg = JSON.parse(ev.data); } catch(e){ return; }
+    try { msg = JSON.parse(ev.data); } catch(e){ logEvent({raw: ev.data}); return; }
     handleWsMessage(msg);
   };
-  ws.onclose = () => { updateWsStatus('disconnected'); toast('WS disconnected — reconnecting'); scheduleReconnect(); };
-  ws.onerror = (e) => { updateWsStatus('error'); console.warn('ws error', e); };
+  ws.onclose = () => { updateWsStatus('disconnected'); toast('WS disconnected — reconnecting'); stopTrafficMonitor(); scheduleReconnect(); };
+  ws.onerror = (e) => { updateWsStatus('error'); console.warn('ws error', e); stopTrafficMonitor(); };
 }
 function scheduleReconnect(){ if(reconnectTimer) return; reconnectTimer = setTimeout(()=>{ reconnectTimer=null; if(user && user.apiKey) initWS(); }, 3000); }
 function updateWsStatus(s){ const el = document.getElementById('ws_status'); el.innerText = s; }
 function startPing(){ if(pingInterval) clearInterval(pingInterval); pingInterval = setInterval(()=>{ try{ ws && ws.send('ping'); }catch(e){} }, 20000); }
-function stopWS(){ try{ if(pingInterval) clearInterval(pingInterval); pingInterval=null; if(ws){ ws.close(); ws=null; } updateWsStatus('stopped'); }catch(e){} }
+function stopWS(){ try{ if(pingInterval) clearInterval(pingInterval); pingInterval=null; if(ws){ ws.close(); ws=null; } updateWsStatus('stopped'); stopTrafficMonitor(); }catch(e){} }
+
+let trafficInterval = null;
+function startTrafficMonitor(){
+  if(trafficInterval) return;
+  trafficInterval = setInterval(()=> {
+    console.log('WS bytes/sec:', wsTrafficBytes);
+    wsTrafficBytes = 0;
+  }, 1000);
+}
+function stopTrafficMonitor(){
+  if(trafficInterval) clearInterval(trafficInterval);
+  trafficInterval = null;
+  wsTrafficBytes = 0;
+}
 
 /* ========== WS message handling ========== */
 function handleWsMessage(msg){
   const type = msg.type || msg.event || 'event';
   if(type === 'saved'){
-    // server now sends branch field; ensure file key uses branch prefix
-    // msg.file may be 'branch/fname.json' or just fname depending on server; keep it as-is
-    addOrUpdateFile(msg);
+    queueFileUpdate(msg);
     logEvent({event:'saved', file: msg.file, run: msg.run_id, branch: msg.branch});
   } else if(type === 'run_started' || type === 'started'){
     activeRuns[msg.run_id] = { start_url: msg.start_url || msg.start_url, ts: Date.now() };
@@ -394,43 +480,6 @@ function handleWsMessage(msg){
 }
 
 /* ========== Files UI ========== */
-function addOrUpdateFile(item){
-  const name = item.file;
-  if(!name) return;
-  const now = Date.now();
-  const entry = {
-    name,
-    url: item.url || '',
-    title: item.title || '',
-    content: item.content || '',
-    branch: item.branch || (name.includes('/') ? name.split('/').slice(0,-1).join('/') : ''),
-    run_id: item.run_id || '',
-    ts: now
-  };
-  filesIndex.set(name, entry);
-  filesOrder = Array.from(filesIndex.keys()).sort((a,b)=> filesIndex.get(b).ts - filesIndex.get(a).ts );
-  renderFiles();
-}
-
-async function refreshFiles(){
-  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
-  try{
-    const res = await fetch(`${API}/list`, { headers: defaultHeaders() });
-    if(!res.ok) throw new Error('list failed');
-    const data = await res.json();
-    (data.files || []).forEach(f=>{
-      if(!filesIndex.has(f.name)){
-        filesIndex.set(f.name, { name: f.name, title:'', url:'', content:'', size: f.size || 0, ts: Date.now(), branch: f.name.includes('/') ? f.name.split('/').slice(0,-1).join('/') : '' });
-      }
-    });
-    filesOrder = Array.from(filesIndex.keys()).sort((a,b)=> filesIndex.get(b).ts - filesIndex.get(a).ts);
-    renderFiles();
-  }catch(e){
-    console.warn('refreshFiles', e);
-    toast('Не удалось загрузить список файлов');
-  }
-}
-
 function renderFiles(){
   const container = document.getElementById('files');
   const q = document.getElementById('q').value.trim().toLowerCase();
@@ -441,6 +490,9 @@ function renderFiles(){
     list = list.filter(it => (it.name && it.name.toLowerCase().includes(q)) || (it.url && it.url.toLowerCase().includes(q)) || (it.title && it.title.toLowerCase().includes(q)));
   }
   if(sort === 'new') list.sort((a,b)=> b.ts - a.ts); else list.sort((a,b)=> a.ts - b.ts);
+
+  // build fragment for efficient DOM update
+  const frag = document.createDocumentFragment();
   for(const it of list){
     const div = document.createElement('div'); div.className = 'file-item';
     const meta = document.createElement('div'); meta.className = 'file-meta';
@@ -449,20 +501,58 @@ function renderFiles(){
                       <div class="ftitle">${escapeHtml(it.title || '')}</div>
                       <div class="small muted">Source: <a href="${escapeHtml(it.url||'#')}" target="_blank">${escapeHtml(it.url||'')}</a></div>
                       <div class="small muted">Branch: ${escapeHtml(it.branch || '')}</div>`;
-    if(it.content){
+    if(it.content_preview){
       const pre = document.createElement('pre');
       pre.className = 'preview';
-      pre.innerText = it.content;
+      pre.innerText = it.content_preview;
       meta.appendChild(pre);
     }
     const a = document.createElement('a'); a.href = `${API}/output/${encodeName(it.name)}`; a.target='_blank'; a.innerText='Download'; a.className='ghost';
     const btnCopy = document.createElement('button'); btnCopy.innerText='Copy'; btnCopy.className='ghost';
-    btnCopy.onclick = ()=>{ navigator.clipboard.writeText(it.content || '').then(()=> toast('Copied')); };
+    btnCopy.onclick = ()=>{ navigator.clipboard.writeText(it.content_preview || '').then(()=> toast('Copied')); };
+
     const btnShowLog = document.createElement('button'); btnShowLog.innerText='Log'; btnShowLog.className='ghost';
     btnShowLog.onclick = ()=> fetchLogForFile(it.name);
-    actions.appendChild(a); actions.appendChild(btnCopy); actions.appendChild(btnShowLog);
+
+    // Open (lazy load full content)
+    const btnOpen = document.createElement('button'); btnOpen.innerText='Open'; btnOpen.className='ghost';
+    btnOpen.onclick = async ()=> {
+      await openFullContentModal(it.name, it);
+    };
+
+    actions.appendChild(a); actions.appendChild(btnOpen); actions.appendChild(btnCopy); actions.appendChild(btnShowLog);
     div.appendChild(meta); div.appendChild(actions);
-    container.appendChild(div);
+    frag.appendChild(div);
+  }
+  container.appendChild(frag);
+}
+
+/* Lazy fetch + preview modal */
+async function openFullContentModal(name, it){
+  const previewModal = document.getElementById('previewModal');
+  const previewBody = document.getElementById('previewBody');
+  const previewTitle = document.getElementById('previewTitle');
+  const previewDownload = document.getElementById('previewDownload');
+
+  previewTitle.innerText = name;
+  previewBody.innerText = 'Loading...';
+  previewModal.style.display = 'block';
+  document.getElementById('appRoot').setAttribute('aria-hidden', 'true');
+
+  // If server supports /output/:name returning full text, we fetch it.
+  try {
+    const res = await fetch(`${API}/output/${encodeName(name)}`, { headers: defaultHeaders() });
+    if(!res.ok){
+      const txt = await res.text().catch(()=>null);
+      previewBody.innerText = `Failed to load: ${res.status} ${txt || ''}`;
+      return;
+    }
+    const text = await res.text();
+    previewBody.innerText = text.slice(0, MAX_CONTENT_LEN);
+    previewDownload.onclick = ()=> { window.open(`${API}/output/${encodeName(name)}`, '_blank'); };
+  } catch(e){
+    console.warn('openFullContentModal error', e);
+    previewBody.innerText = 'Ошибка загрузки контента';
   }
 }
 
@@ -488,10 +578,11 @@ function renderDirs(){
     el.innerHTML = '<div class="small muted">Нет веток</div>';
     return;
   }
+  const frag = document.createDocumentFragment();
   dirs.forEach(d=>{
     const div = document.createElement('div'); div.className='dir-item';
     const left = document.createElement('div');
-    left.innerHTML = `<div style="font-weight:700">${escapeHtml(d.branch)}</div><div class="dir-meta">${d.files} file(s) • ${Math.round(d.size/1024)} KB</div>`;
+    left.innerHTML = `<div style="font-weight:700">${escapeHtml(d.branch)}</div><div class="dir-meta">${d.files} file(s) • ${Math.round((d.size||0)/1024)} KB</div>`;
     const right = document.createElement('div');
     const btnDownload = document.createElement('button'); btnDownload.className='ghost'; btnDownload.innerText='Download zip';
     btnDownload.onclick = ()=> { window.open(`${API}/download_dir/${encodeName(d.branch)}`, '_blank'); };
@@ -499,8 +590,9 @@ function renderDirs(){
     btnSelect.onclick = ()=> { selectBranch(d.branch); };
     right.appendChild(btnSelect); right.appendChild(btnDownload);
     div.appendChild(left); div.appendChild(right);
-    el.appendChild(div);
+    frag.appendChild(div);
   });
+  el.appendChild(frag);
 }
 
 function selectBranch(branch){
@@ -516,6 +608,7 @@ function renderRuns(){
   el.innerHTML = '';
   const keys = Object.keys(activeRuns).reverse();
   if(keys.length === 0) el.innerHTML = '<div class="small muted">Нет активных запусков</div>';
+  const frag = document.createDocumentFragment();
   keys.forEach(id=>{
     const r = activeRuns[id];
     const div = document.createElement('div'); div.className='run-item';
@@ -525,8 +618,9 @@ function renderRuns(){
     const btnLogs = document.createElement('button'); btnLogs.className='ghost'; btnLogs.innerText='Logs'; btnLogs.onclick = ()=> downloadRunLog(id);
     right.appendChild(btnLogs); right.appendChild(btnStop);
     div.appendChild(left); div.appendChild(right);
-    el.appendChild(div);
+    frag.appendChild(div);
   });
+  el.appendChild(frag);
 }
 
 /* ========== API actions ========== */
@@ -701,7 +795,7 @@ document.getElementById('btnStartBG').onclick = ()=> startCrawl(true);
 document.getElementById('btnList').onclick = ()=> refreshFiles();
 document.getElementById('btnRefresh').onclick = ()=> { if(!user){ showLoginModal(true); toast('Вход обязателен'); return; } refreshFiles(); loadDirs(); toast('Refreshed'); };
 document.getElementById('clearSearch').onclick = ()=> { document.getElementById('q').value=''; renderFiles(); };
-document.getElementById('q').oninput = ()=> renderFiles();
+document.getElementById('q').oninput = debounce(()=> renderFiles(), 200);
 document.getElementById('sort').onchange = ()=> renderFiles();
 document.getElementById('btnClearLog').onclick = ()=> { document.getElementById('log').innerText=''; };
 document.getElementById('btnDownloadLog').onclick = async ()=> {
@@ -733,12 +827,41 @@ document.getElementById('loginCancel').onclick = ()=> showLoginModal(false);
 document.getElementById('loginSubmit').onclick = ()=> handleLogin();
 document.getElementById('btnLogout').onclick = ()=> handleLogout();
 
+/* Preview modal buttons */
+document.getElementById('previewClose').onclick = ()=> {
+  document.getElementById('previewModal').style.display='none';
+  document.getElementById('appRoot').setAttribute('aria-hidden','false');
+};
+
 /* close modal on backdrop click */
 document.getElementById('loginBackdrop').onclick = (e)=> {
   if(e.target === document.getElementById('loginBackdrop')) {
     if(user) showLoginModal(false);
   }
 };
+
+/* ========== Utilities ========== */
+function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+
+/* ========== Files list refresh ========== */
+async function refreshFiles(){
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
+  try{
+    const res = await fetch(`${API}/list`, { headers: defaultHeaders() });
+    if(!res.ok) throw new Error('list failed');
+    const data = await res.json();
+    (data.files || []).forEach(f=>{
+      if(!filesIndex.has(f.name)){
+        filesIndex.set(f.name, { name: f.name, title:'', url:'', content_preview: (f.preview || '').slice(0, PREVIEW_LEN), size: f.size || 0, ts: Date.now(), branch: f.name.includes('/') ? f.name.split('/').slice(0,-1).join('/') : '' });
+      }
+    });
+    filesOrder = Array.from(filesIndex.keys()).sort((a,b)=> filesIndex.get(b).ts - filesIndex.get(a).ts);
+    renderFiles();
+  }catch(e){
+    console.warn('refreshFiles', e);
+    toast('Не удалось загрузить список файлов');
+  }
+}
 
 /* ========== Init: require login on load ========== */
 loadUser();

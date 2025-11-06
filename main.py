@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, HttpUrl
 import uvicorn
+import zipfile
 
 from crawler import AsyncCrawler, setup_logging
 
@@ -247,9 +248,9 @@ async def get_status(run_id: str):
 
 @app.get("/api/list")
 async def list_outputs():
-    """Backward-compatible file list (all files under OUTPUT_DIR, flattened)."""
+    """Return only .md files (no .json)."""
     files = []
-    for p in sorted(OUTPUT_DIR.rglob("*")):
+    for p in sorted(OUTPUT_DIR.rglob("*.md")):
         if p.is_file():
             rel = p.relative_to(OUTPUT_DIR)
             files.append({"name": str(rel), "size": p.stat().st_size, "path": str(p)})
@@ -258,21 +259,20 @@ async def list_outputs():
 
 @app.get("/api/dirs")
 async def list_dirs():
-    """List branches (top-level netloc folders and nested) with counts and sizes."""
+    """List branches (directories that contain .md files) with counts and sizes."""
     dirs = []
     base = OUTPUT_DIR
     if not base.exists():
         return {"dirs": []}
+    # walk directories and check for md files
     for p in sorted(base.rglob("*")):
         if p.is_dir():
-            # only include directories that contain files
-            files = list(p.glob("**/*"))
-            files = [f for f in files if f.is_file()]
-            if not files:
+            md_files = [f for f in p.glob("**/*.md") if f.is_file()]
+            if not md_files:
                 continue
-            total = sum(f.stat().st_size for f in files)
+            total = sum(f.stat().st_size for f in md_files)
             rel = str(p.relative_to(base))
-            dirs.append({"branch": rel, "files": len(files), "size": total})
+            dirs.append({"branch": rel, "files": len(md_files), "size": total})
     # Deduplicate by branch (keep unique)
     uniq = {}
     for d in dirs:
@@ -288,7 +288,7 @@ async def list_files_in_dir(dir_path: str):
     if not target.exists() or not target.is_dir():
         raise HTTPException(status_code=404, detail="Directory not found")
     files = []
-    for p in sorted(target.glob("**/*")):
+    for p in sorted(target.glob("**/*.md")):
         if p.is_file():
             rel = p.relative_to(OUTPUT_DIR)
             files.append({"name": str(rel), "size": p.stat().st_size, "path": str(p)})
@@ -303,10 +303,21 @@ async def download_dir(dir_path: str):
     if not target.exists() or not target.is_dir():
         raise HTTPException(status_code=404, detail="Directory not found")
 
-    # create temporary directory to hold archive
+    # create a temporary zip containing only .md files from target
     tmpdir = tempfile.mkdtemp(prefix="crawler-zip-")
-    base_name = os.path.join(tmpdir, "archive")
-    archive_path = shutil.make_archive(base_name, 'zip', root_dir=str(target))
+    archive_path = os.path.join(tmpdir, "archive.zip")
+    try:
+        with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for p in target.rglob("*.md"):
+                if p.is_file():
+                    arcname = str(p.relative_to(OUTPUT_DIR))
+                    zf.write(p, arcname)
+    except Exception:
+        logger.exception("Failed to create zip for %s", target)
+        # cleanup
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        raise HTTPException(status_code=500, detail="Failed to create archive")
+
     # schedule cleanup in 60s
     def _cleanup(pathp, d):
         try:
@@ -325,13 +336,15 @@ async def download_dir(dir_path: str):
 
 @app.get("/api/output/{name:path}")
 async def get_output_file(name: str):
-    # `name` is a relative path inside OUTPUT_DIR
+    # Allow only .md files to be served
     p = (OUTPUT_DIR / name).resolve()
     if not str(p).startswith(str(OUTPUT_DIR.resolve())):
         raise HTTPException(status_code=400, detail="Invalid path")
     if not p.exists():
         raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(p, media_type="application/octet-stream", filename=p.name)
+    if p.suffix.lower() != ".md":
+        raise HTTPException(status_code=400, detail="Only .md files are directly downloadable")
+    return FileResponse(p, media_type="text/markdown", filename=p.name)
 
 
 @app.get("/api/logs/{run_id}")

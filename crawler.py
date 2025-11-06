@@ -8,10 +8,8 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, urlunparse, parse_qsl, urlencode
 import urllib.robotparser as robotparser
 from slugify import slugify
-from tqdm import tqdm
 import logging
 import time
-import json
 import hashlib
 from pathlib import Path
 from collections import deque
@@ -61,7 +59,8 @@ def make_safe_filename(index: int, url: str, title: str) -> str:
     last = path.split("/")[-1] or "page"
     base = slugify(last) or slugify(title or "") or "page"
     h = hashlib.md5(url.encode("utf-8")).hexdigest()[:6]
-    return f"{index:05d}_{base}_{h}.json"
+    # use .md filename
+    return f"{index:05d}_{base}_{h}.md"
 
 
 def extract_text(soup: BeautifulSoup) -> tuple[str, str]:
@@ -225,44 +224,30 @@ class AsyncCrawler:
     async def parse_and_save(self, url: str, html: str):
         soup = BeautifulSoup(html, "html.parser")
         title, content = extract_text(soup)
-        data = {
-            "url": url,
-            "title": title,
-            "content": content,
-            "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        }
-        if self.save_html:
-            raw = html
-            if isinstance(raw, str) and len(raw) > MAX_RAW_HTML_BYTES:
-                raw = raw[:MAX_RAW_HTML_BYTES] + "\n\n<!-- truncated -->"
-            data["raw_html"] = raw
-        else:
-            data["raw_html"] = None
+        # create markdown file only (no JSON)
+        md_name = make_safe_filename(self.index + 1, url, title)  # index not yet incremented
+        md_path = self._branch_path_for_url(url) / md_name
 
-        self.index += 1
-        fname = make_safe_filename(self.index, url, title)
-
-        # determine branch directory and save file there
-        branch_dir = self._branch_path_for_url(url)
-        out_path = branch_dir / fname
-
-        try:
-            async with aiofiles.open(out_path, mode="w", encoding="utf-8") as f:
-                await f.write(json.dumps(data, ensure_ascii=False, indent=2))
-        except Exception:
-            self.logger.exception("Failed to write JSON file %s", out_path)
-
-        md_name = fname.replace(".json", ".md")
-        md_path = branch_dir / md_name
         try:
             async with aiofiles.open(md_path, mode="w", encoding="utf-8") as f:
-                await f.write(f"# {data.get('title','')}\n\n")
-                await f.write(f"Source: {data['url']}\n\n")
-                await f.write(data.get("content", ""))
+                await f.write(f"# {title}\n\n")
+                await f.write(f"Source: {url}\n\n")
+                await f.write(content or "")
+                # optionally include raw_html if save_html True (capped)
+                if self.save_html:
+                    raw = html
+                    if isinstance(raw, str) and len(raw) > MAX_RAW_HTML_BYTES:
+                        raw = raw[:MAX_RAW_HTML_BYTES] + "\n\n<!-- truncated -->"
+                    await f.write("\n\n---\n\n")
+                    await f.write("<!-- raw_html included, truncated -->\n\n")
+                    await f.write(raw)
         except Exception:
             self.logger.exception("Failed to write MD file %s", md_path)
 
-        self.logger.info("Saved [%d] %s -> %s", self.index, url, str(out_path.relative_to(self.output_dir)))
+        # increment index after successful save
+        self.index += 1
+
+        self.logger.info("Saved [%d] %s -> %s", self.index, url, str(md_path.relative_to(self.output_dir)))
         if self.pbar:
             self.pbar.update(1)
 
@@ -270,18 +255,17 @@ class AsyncCrawler:
         if self.status_callback:
             try:
                 MAX_CONTENT_LEN = 20_000
-                # branch relative path
-                branch_rel = str(out_path.parent.relative_to(self.output_dir))
+                branch_rel = str(md_path.parent.relative_to(self.output_dir))
                 payload = {
                     "type": "saved",
                     "index": self.index,
-                    "file": str(Path(branch_rel) / fname),
+                    "file": str(Path(branch_rel) / md_name),
                     "url": url,
                     "title": title,
                     "content": (content or "")[:MAX_CONTENT_LEN],
                     "branch": branch_rel
                 }
-                self.logger.debug("Calling status_callback for %s -> %s", url, out_path.name)
+                self.logger.debug("Calling status_callback for %s -> %s", url, md_name)
                 self.status_callback(payload)
             except Exception:
                 self.logger.exception("status_callback failed after saving file")
