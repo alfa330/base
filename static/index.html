@@ -11,62 +11,68 @@
       --radius:12px;
     }
     :root.light{
-      --bg:#f5f7fb; --card:#ffffff; --muted:#667085; --accent:#2563eb; --accent-2:#7c3aed; --text:#0b1220;
+      --bg:#f5f7fb; --card:#ffffff; --muted:#667085; --accent:#2563eb; --accent-2:#7caed6; --text:#0b1220;
       --glass: rgba(2,6,23,0.03);
     }
     *{box-sizing:border-box}
     html,body{height:100%; margin:0; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:linear-gradient(180deg,var(--bg), #071029); color:var(--text); -webkit-font-smoothing:antialiased}
-    .container{max-width:1100px; margin:28px auto; padding:20px}
+    .container{max-width:1200px; margin:28px auto; padding:20px}
     header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
     h1{font-size:20px;margin:0}
     .sub{color:var(--muted);font-size:13px}
     .top-actions{display:flex;gap:8px;align-items:center}
     .card{background:var(--card); padding:14px; border-radius:var(--radius); box-shadow:0 6px 20px rgba(2,6,23,0.5); border:1px solid rgba(255,255,255,0.03)}
     .grid{display:grid; gap:14px}
-    .cols-3{grid-template-columns: 1.3fr 1fr 0.9fr}
-    .cols-2{grid-template-columns: 1fr 1fr}
+    .cols-2{grid-template-columns: 1.25fr 0.85fr}
     label{font-size:13px;color:var(--muted)}
-    input[type="text"], input[type="number"], input[type="password"], select { width:100%; padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:var(--text) }
+    input[type="text"], input[type="number"], input[type="password"], select { width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:var(--text) }
     input[type="checkbox"]{transform:scale(1.1); margin-right:6px}
     button { background:linear-gradient(90deg,var(--accent),var(--accent-2)); border:none; color:white; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:600 }
     button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06); color:var(--text); font-weight:600}
     button.plain{background:transparent;border:none;color:var(--accent);padding:6px 8px;border-radius:8px}
-    button:disabled, .ghost[disabled]{opacity:0.45;cursor:not-allowed}
+    button.small{padding:6px 8px;font-size:13px;border-radius:8px}
+    button.tertiary{background:transparent;border:1px dashed rgba(255,255,255,0.04)}
+    button.danger{background:#ef4444}
     .row{display:flex;gap:10px;align-items:center}
     .small{font-size:13px;color:var(--muted)}
     .muted{color:var(--muted)}
-    #files{max-height:46vh; overflow:auto; display:flex; flex-direction:column; gap:8px; padding-top:8px}
-    .file-item{display:flex; gap:12px; align-items:flex-start; padding:10px; border-radius:10px; background:var(--glass); border:1px solid rgba(255,255,255,0.02)}
-    .file-meta{flex:1}
-    .file-actions{display:flex;gap:8px;align-items:center}
-    .fname{font-weight:700}
-    .ftitle{color:var(--muted); font-size:13px; margin-top:4px}
-    pre.preview{background:rgba(0,0,0,0.12); padding:8px; border-radius:8px; max-height:160px; overflow:auto; margin-top:8px; white-space:pre-wrap}
-    .runs-list{display:flex;flex-direction:column; gap:8px; max-height:24vh; overflow:auto}
-    .run-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:8px;background:var(--glass)}
-    .log-area{height:150px; overflow:auto; background:rgba(0,0,0,0.06); padding:10px; border-radius:8px; font-family:monospace; font-size:12px; color:var(--muted)}
+    .log-area{height:180px; overflow:auto; background:rgba(0,0,0,0.06); padding:10px; border-radius:8px; font-family:monospace; font-size:12px; color:var(--muted)}
     .controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
     .search{display:flex; gap:8px; align-items:center; margin-bottom:8px}
     .tag{display:inline-block;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.02);font-size:12px;color:var(--muted)}
     footer{margin-top:18px;color:var(--muted);font-size:13px;text-align:center}
     .toast{position:fixed;right:20px;bottom:20px;padding:10px 16px;border-radius:10px;background:#111827;color:white;box-shadow:0 6px 20px rgba(2,6,23,0.5);z-index:80}
-    .btn-danger{background:#ef4444}
-    .dir-list{display:flex;flex-direction:column;gap:8px;max-height:18vh;overflow:auto;margin-top:8px}
-    .dir-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)}
-    .dir-meta{font-size:13px;color:var(--muted)}
+
+    /* Branches (visual upgrade) */
+    .branches-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:8px}
+    .branch-card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.03); display:flex; flex-direction:column; gap:8px; min-height:90px}
+    .branch-title{font-weight:800;font-size:15px}
+    .branch-meta{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .branch-actions{display:flex;gap:8px; margin-top:auto; align-items:center}
+    .branch-strong{font-weight:700; font-size:14px}
+    .branch-pill{background:rgba(255,255,255,0.03); padding:6px 8px;border-radius:999px; font-size:12px}
+    .branch-search-wrap{display:flex;gap:8px;align-items:center}
+    .branch-count{font-size:12px;color:var(--muted)}
+
+    /* Runs */
+    .runs-list{display:flex;flex-direction:column; gap:10px; max-height:36vh; overflow:auto}
+    .run-item{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:10px;background:var(--glass); border:1px solid rgba(255,255,255,0.02)}
+    .run-left{display:flex;gap:10px;align-items:center}
+    .status-dot{width:10px;height:10px;border-radius:50%}
+    .status-running{background:#10b981}
+    .status-finished{background:#64748b}
+
     /* login modal */
     .modal-backdrop{position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:100}
-    .modal{width:360px;background:var(--card);padding:16px;border-radius:12px;box-shadow:0 10px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.04)}
+    .modal{width:420px;background:var(--card);padding:18px;border-radius:12px;box-shadow:0 10px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.04)}
     .modal h3{margin:0 0 8px 0}
     .modal .error{color:#f87171;margin-top:8px}
-    .modal .row{margin-top:10px}
-    .mini{font-size:12px;color:var(--muted)}
     .preview-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:120;max-width:90%;width:900px;max-height:86vh;overflow:auto}
-    .preview-content{background:var(--card);padding:16px;border-radius:12px;border:1px solid rgba(255,255,255,0.04)}
     @media (max-width:980px){
-      .cols-3{grid-template-columns: 1fr}
+      .cols-2{grid-template-columns: 1fr}
       .modal{width:92%}
       .preview-modal{width:92%}
+      .branches-grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
     }
   </style>
 </head>
@@ -75,141 +81,117 @@
     <header>
       <div>
         <h1>Async Crawler — Control</h1>
-        <div class="sub">Запускай обход, смотри результаты в реальном времени через WebSocket</div>
+        <div class="sub">Запускай обход, смотри состояние запуска и ветки — вход обязателен</div>
       </div>
       <div class="top-actions">
-        <div class="small muted">Тек. соединение: <span id="ws_status">—</span></div>
+        <div class="small muted">WS: <span id="ws_status">—</span></div>
         <div id="userBlock" style="display:flex;align-items:center;gap:8px">
           <div class="mini muted" id="userName">—</div>
           <button id="btnLogin" class="ghost">Вход</button>
           <button id="btnLogout" class="ghost" style="display:none">Выйти</button>
         </div>
-        <button id="btnRefresh" class="ghost" title="Обновить список файлов">Обновить</button>
+        <button id="btnRefresh" class="ghost" title="Обновить ветки">Обновить</button>
         <button id="toggleTheme" class="ghost">Тёмная/Светлая</button>
       </div>
     </header>
 
-<main class="grid cols-3" style="align-items:start">
-  <!-- Left: Start form + Outputs -->
-  <section>
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div>
-          <div style="font-weight:700">Start new crawl</div>
-          <div class="small muted">Укажи стартовый URL и опции</div>
+    <main class="grid cols-2" style="align-items:start">
+      <!-- LEFT: Start form + Branches (expanded & visual) -->
+      <section>
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div>
+              <div style="font-weight:700">Start new crawl</div>
+              <div class="small muted">Укажи стартовый URL и опции</div>
+            </div>
+            <div class="tag" id="last_run_info">—</div>
+          </div>
+
+          <div style="display:grid;gap:8px">
+            <label>Start URL
+              <input id="start_url" type="text" placeholder="https://example.com/path" />
+            </label>
+
+            <div style="display:flex;gap:8px">
+              <label style="flex:1">Prefix (optional)
+                <input id="prefix" type="text" placeholder="/docs/path" />
+              </label>
+              <label style="width:120px">Concurrency
+                <input id="concurrency" type="number" value="5" min="1" />
+              </label>
+            </div>
+
+            <div class="row">
+              <label><input id="save_html" type="checkbox" /> Save raw HTML</label>
+              <label class="small muted" style="margin-left:auto">Max preview: <span id="max_preview">200</span> chars</label>
+            </div>
+
+            <div class="controls" style="margin-top:6px">
+              <button id="btnStart" disabled>Start</button>
+              <button id="btnStartBG" class="ghost" title="Start in background" disabled>Start (bg)</button>
+              <button id="btnStopAll" class="ghost" disabled>Stop all</button>
+            </div>
+
+            <pre id="start_result" class="log-area" style="margin-top:10px"></pre>
+          </div>
         </div>
-        <div class="tag" id="last_run_info">—</div>
-      </div>
 
-      <div style="display:grid;gap:8px">
-        <label>Start URL
-          <input id="start_url" type="text" placeholder="https://example.com/path" />
-        </label>
+        <!-- Branches: BIG and visually clear -->
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div>
+              <div style="font-weight:700">Branches (ветки)</div>
+              <div class="small muted">Группировка файлов — удобно скачивать и фильтровать</div>
+            </div>
+            <div class="branch-search-wrap">
+              <input id="branch_q" type="text" placeholder="Поиск веток..." />
+              <select id="branch_sort" class="ghost" style="padding:8px;border-radius:8px">
+                <option value="files_desc">По файлам ↓</option>
+                <option value="files_asc">По файлам ↑</option>
+                <option value="name_az">По имени A→Z</option>
+                <option value="name_za">По имени Z→A</option>
+              </select>
+            </div>
+          </div>
 
-        <div style="display:flex;gap:8px">
-          <label style="flex:1">Prefix (optional)
-            <input id="prefix" type="text" placeholder="/docs/path" />
-          </label>
-          <label style="width:120px">Concurrency
-            <input id="concurrency" type="number" value="5" min="1" />
-          </label>
+          <div id="dirs" class="branches-grid" aria-live="polite">
+            <div class="small muted">Загрузка веток...</div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
+            <button id="btnRefreshDirs" class="ghost">Обновить ветки</button>
+            <button id="btnDownloadSelected" class="ghost" disabled>Download selected</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: Runs and Logs -->
+      <aside>
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-weight:700">Active runs</div>
+            <div class="small muted">Текущие запуски</div>
+          </div>
+          <div class="runs-list" id="runs"></div>
         </div>
 
-        <div class="row">
-          <label><input id="save_html" type="checkbox" /> Save raw HTML</label>
-          <label class="small muted" style="margin-left:auto">Max preview: <span id="max_preview">20000</span> chars</label>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-weight:700">Event log</div>
+            <div class="small muted">Последние события</div>
+          </div>
+          <div id="log" class="log-area"></div>
+          <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end">
+            <button id="btnClearLog" class="ghost">Очистить</button>
+            <button id="btnDownloadLog" class="ghost" disabled>Скачать лог (последний)</button>
+          </div>
         </div>
+      </aside>
+    </main>
 
-        <div class="controls" style="margin-top:6px">
-          <button id="btnStart" disabled>Start</button>
-          <button id="btnStartBG" class="ghost" title="Start in background" disabled>Start (bg)</button>
-          <button id="btnList" class="ghost" disabled>List outputs</button>
-        </div>
-
-        <pre id="start_result" class="log-area" style="margin-top:10px"></pre>
-      </div>
-    </div>
-
-    <div style="height:16px"></div>
-
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div style="font-weight:700">Outputs</div>
-        <div class="small muted">Файлы появляются автоматически</div>
-      </div>
-
-      <div class="search">
-        <input id="q" type="text" placeholder="Поиск по имени или URL" />
-        <select id="sort">
-          <option value="new">Сначала новые</option>
-          <option value="old">Сначала старые</option>
-        </select>
-        <button id="clearSearch" class="ghost">Очистить</button>
-      </div>
-
-      <div id="files" aria-live="polite"></div>
-    </div>
-  </section>
-
-  <!-- Middle: Runs and Logs -->
-  <aside>
-    <div class="card" style="margin-bottom:12px">
-      <div style="font-weight:700;margin-bottom:8px">Active runs</div>
-      <div class="runs-list" id="runs"></div>
-    </div>
-
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div style="font-weight:700">Event log</div>
-        <div class="small muted">Последние события</div>
-      </div>
-      <div id="log" class="log-area"></div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button id="btnClearLog" class="ghost">Очистить</button>
-        <button id="btnDownloadLog" class="ghost" disabled>Скачать лог (последний)</button>
-      </div>
-    </div>
-  </aside>
-
-  <!-- Right: Directories, Quick actions & help -->
-  <section>
-    <div class="card" style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div style="font-weight:700">Branches (директории)</div>
-        <div class="small muted">Группировка файлов</div>
-      </div>
-
-      <div id="dirs" class="dir-list"><div class="small muted">Загрузка...</div></div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button id="btnRefreshDirs" class="ghost">Обновить ветки</button>
-        <button id="btnDownloadSelected" class="ghost" disabled>Download selected</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div style="font-weight:700">Quick actions</div>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-        <button id="btnShowFiles" class="ghost" disabled>Показать все файлы</button>
-        <button id="btnClearOutputs" class="ghost">Очистить список (локально)</button>
-        <button id="btnStopAll" class="btn-danger" disabled>Stop all runs</button>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:12px">
-      <div style="font-weight:700">Help</div>
-      <div class="small muted" style="margin-top:8px">
-        • Запуск стартует краулер на сервере. <br>
-        • Каждая сохранённая страница пушится на фронт через WebSocket и отображается в Outputs. <br>
-        • Файлы группируются по веткам (branch). Нажми «Download» рядом с веткой, чтобы скачать zip. <br>
-        • Для управления требуется логин (API key).
-      </div>
-    </div>
-  </section>
-</main>
-
-<footer>
-  Crawler UI — оптимизированный интерфейс. Разворачивай, тестируй, улучшай.
-</footer>
+    <footer>
+      Crawler UI — оптимизированный интерфейс. Убраны прямые потоки Outputs, оставлены ветки (Branches) и логи.
+    </footer>
   </div>
 
   <div id="toast" class="toast" style="display:none"></div>
@@ -237,40 +219,21 @@
     </div>
   </div>
 
-  <!-- Preview modal -->
-  <div id="previewModal" class="preview-modal" style="display:none">
-    <div class="preview-content card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div id="previewTitle" style="font-weight:700">Preview</div>
-        <div>
-          <button id="previewDownload" class="plain">Download</button>
-          <button id="previewClose" class="ghost">Close</button>
-        </div>
-      </div>
-      <pre id="previewBody" style="white-space:pre-wrap;max-height:70vh;overflow:auto;font-family:monospace"></pre>
-    </div>
-  </div>
-
 <script>
 /* ========== CONFIG ========== */
-const API = '/api'; // local crawler backend (expects /list, /start, /stop/:id, /output/:name, /dirs, /download_dir/:branch, /logs/:id)
-const API_BASE_URL = 'https://otp-2-fos4.onrender.com'; // external auth service (provided)
+const API = '/api'; // local crawler backend
+const API_BASE_URL = 'https://otp-2-fos4.onrender.com'; // external auth
 const WS_PATH = '/ws';
-const MAX_CONTENT_LEN = 200; // when showing full content in UI, trim to this
-const PREVIEW_LEN = 200; // how many chars of content kept as preview on client
-const FILE_BATCH_MS = 250; // batching window for incoming WS saved events
-const MAX_LOG_CHARS = 10000; // limit log size in UI
+const MAX_LOG_CHARS = 12000;
 
 /* ========== STATE ========== */
 let ws = null;
 let reconnectTimer = null;
 let pingInterval = null;
 let activeRuns = {}; // run_id -> meta
-let filesIndex = new Map(); // key: relative path (branch/file) -> {name, title, url, content_preview, branch, size, ts}
-let filesOrder = [];
 let theme = localStorage.getItem('theme') || 'dark';
 if(theme === 'light') document.documentElement.classList.add('light'); else document.documentElement.classList.remove('light');
-document.getElementById('max_preview').innerText = PREVIEW_LEN;
+document.getElementById('max_preview').innerText = 200;
 
 let user = null; // {role,id,name,telegram_id,apiKey}
 let dirs = []; // branches list
@@ -287,7 +250,6 @@ function loadUser(){
 function saveUser(u){
   user = u;
   if(u) {
-    // keep only small user object — do not store large data
     const safe = { role: u.role || null, id: u.id || null, name: u.name || null, telegram_id: u.telegram_id || null, apiKey: u.apiKey || null };
     localStorage.setItem('crawler_user', JSON.stringify(safe));
   } else {
@@ -301,38 +263,31 @@ function updateUserUI(){
   const btnLogout = document.getElementById('btnLogout');
   const startBtn = document.getElementById('btnStart');
   const startBG = document.getElementById('btnStartBG');
-  const listBtn = document.getElementById('btnList');
   const refreshBtn = document.getElementById('btnRefresh');
-  const showFilesBtn = document.getElementById('btnShowFiles');
   const stopAllBtn = document.getElementById('btnStopAll');
   const downloadLogBtn = document.getElementById('btnDownloadLog');
+  const downloadSelected = document.getElementById('btnDownloadSelected');
 
   if(user && user.name){
     userName.innerText = user.name + (user.role ? ` (${user.role})` : '');
-    btnLogin.style.display = 'none';
-    btnLogout.style.display = 'inline-flex';
-    // enable actions
-    startBtn.disabled = false;
-    startBG.disabled = false;
-    listBtn.disabled = false;
-    refreshBtn.disabled = false;
-    showFilesBtn.disabled = false;
-    stopAllBtn.disabled = false;
-    downloadLogBtn.disabled = false;
-    document.getElementById('btnDownloadSelected').disabled = !selectedBranch;
+    if(btnLogin) btnLogin.style.display = 'none';
+    if(btnLogout) btnLogout.style.display = 'inline-flex';
+    if(startBtn) startBtn.disabled = false;
+    if(startBG) startBG.disabled = false;
+    if(refreshBtn) refreshBtn.disabled = false;
+    if(stopAllBtn) stopAllBtn.disabled = false;
+    if(downloadLogBtn) downloadLogBtn.disabled = false;
+    if(downloadSelected) downloadSelected.disabled = !selectedBranch;
   } else {
-    userName.innerText = '—';
-    btnLogin.style.display = 'inline-flex';
-    btnLogout.style.display = 'none';
-    // disable actions
-    startBtn.disabled = true;
-    startBG.disabled = true;
-    listBtn.disabled = true;
-    refreshBtn.disabled = true;
-    showFilesBtn.disabled = true;
-    stopAllBtn.disabled = true;
-    downloadLogBtn.disabled = true;
-    document.getElementById('btnDownloadSelected').disabled = true;
+    if(userName) userName.innerText = '—';
+    if(btnLogin) btnLogin.style.display = 'inline-flex';
+    if(btnLogout) btnLogout.style.display = 'none';
+    if(startBtn) startBtn.disabled = true;
+    if(startBG) startBG.disabled = true;
+    if(refreshBtn) refreshBtn.disabled = true;
+    if(stopAllBtn) stopAllBtn.disabled = true;
+    if(downloadLogBtn) downloadLogBtn.disabled = true;
+    if(downloadSelected) downloadSelected.disabled = true;
   }
 }
 
@@ -367,58 +322,6 @@ function defaultHeaders(){
   return headers;
 }
 
-/* ========== Batching for WS file updates ========== */
-let fileUpdateBuffer = [];
-let fileRenderTimer = null;
-
-function queueFileUpdate(item){
-    if(fileUpdateBuffer.length > 1000){
-    // apply immediately to avoid unbounded growth
-    clearTimeout(fileRenderTimer);
-    fileRenderTimer = null;
-    for(const it of fileUpdateBuffer) addOrUpdateFileImmediate(it);
-    fileUpdateBuffer = [];
-    renderFiles();
-    return;
-  }
-  // keep only necessary pieces of item to avoid memory bloat
-  const slim = {
-    file: item.file,
-    url: item.url || '',
-    title: item.title || '',
-    content: item.content ? (item.content.slice(0, PREVIEW_LEN)) : '',
-    branch: item.branch || (item.file && item.file.includes('/') ? item.file.split('/').slice(0,-1).join('/') : ''),
-    run_id: item.run_id || ''
-  };
-  fileUpdateBuffer.push(slim);
-  if(fileRenderTimer) return;
-  fileRenderTimer = setTimeout(()=> {
-    for(const it of fileUpdateBuffer) addOrUpdateFileImmediate(it);
-    fileUpdateBuffer = [];
-    fileRenderTimer = null;
-    // render once after applying batch
-    renderFiles();
-  }, FILE_BATCH_MS);
-}
-
-/* immediate add/update used by the batcher */
-function addOrUpdateFileImmediate(item){
-  const name = item.file;
-  if(!name) return;
-  const now = Date.now();
-  const entry = {
-    name,
-    url: item.url || '',
-    title: item.title || '',
-    content_preview: (item.content || '').slice(0, PREVIEW_LEN),
-    branch: item.branch || (name.includes('/') ? name.split('/').slice(0,-1).join('/') : ''),
-    run_id: item.run_id || '',
-    ts: now
-  };
-  filesIndex.set(name, entry);
-  filesOrder = Array.from(filesIndex.keys()).sort((a,b)=> filesIndex.get(b).ts - filesIndex.get(a).ts );
-}
-
 /* ========== WS (only after login) ========== */
 let wsTrafficBytes = 0;
 function initWS(){
@@ -428,11 +331,16 @@ function initWS(){
   }
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const uri = `${proto}//${location.host}${WS_PATH}?key=${encodeURIComponent(user.apiKey)}`;
-  ws = new WebSocket(uri);
+  try {
+    ws = new WebSocket(uri);
+  } catch(e){
+    console.warn('WS create failed', e);
+    updateWsStatus('error');
+    return;
+  }
   updateWsStatus('connecting');
-  ws.onopen = () => { updateWsStatus('connected'); toast('WS connected'); startPing(); startTrafficMonitor(); };
+  ws.onopen = () => { updateWsStatus('connected'); toast('WS connected', 1200); startPing(); startTrafficMonitor(); };
   ws.onmessage = (ev) => {
-    // measure traffic
     try {
       if(typeof ev.data === 'string') wsTrafficBytes += ev.data.length;
       else if(ev.data instanceof ArrayBuffer) wsTrafficBytes += ev.data.byteLength;
@@ -441,11 +349,11 @@ function initWS(){
     try { msg = JSON.parse(ev.data); } catch(e){ logEvent({raw: ev.data}); return; }
     handleWsMessage(msg);
   };
-  ws.onclose = () => { updateWsStatus('disconnected'); toast('WS disconnected — reconnecting'); stopTrafficMonitor(); scheduleReconnect(); };
+  ws.onclose = () => { updateWsStatus('disconnected'); toast('WS disconnected — reconnecting', 1000); stopTrafficMonitor(); scheduleReconnect(); };
   ws.onerror = (e) => { updateWsStatus('error'); console.warn('ws error', e); stopTrafficMonitor(); };
 }
 function scheduleReconnect(){ if(reconnectTimer) return; reconnectTimer = setTimeout(()=>{ reconnectTimer=null; if(user && user.apiKey) initWS(); }, 3000); }
-function updateWsStatus(s){ const el = document.getElementById('ws_status'); el.innerText = s; }
+function updateWsStatus(s){ const el = document.getElementById('ws_status'); if(el) el.innerText = s; }
 function startPing(){ if(pingInterval) clearInterval(pingInterval); pingInterval = setInterval(()=>{ try{ ws && ws.send('ping'); }catch(e){} }, 20000); }
 function stopWS(){ try{ if(pingInterval) clearInterval(pingInterval); pingInterval=null; if(ws){ ws.close(); ws=null; } updateWsStatus('stopped'); stopTrafficMonitor(); }catch(e){} }
 
@@ -453,7 +361,7 @@ let trafficInterval = null;
 function startTrafficMonitor(){
   if(trafficInterval) return;
   trafficInterval = setInterval(()=> {
-    console.log('WS bytes/sec:', wsTrafficBytes);
+    // console.log('WS bytes/sec:', wsTrafficBytes);
     wsTrafficBytes = 0;
   }, 1000);
 }
@@ -466,10 +374,7 @@ function stopTrafficMonitor(){
 /* ========== WS message handling ========== */
 function handleWsMessage(msg){
   const type = msg.type || msg.event || 'event';
-  if(type === 'saved'){
-    queueFileUpdate(msg);
-    logEvent({event:'saved', file: msg.file, run: msg.run_id, branch: msg.branch});
-  } else if(type === 'run_started' || type === 'started'){
+  if(type === 'run_started' || type === 'started'){
     activeRuns[msg.run_id] = { start_url: msg.start_url || msg.start_url, ts: Date.now() };
     renderRuns();
     logEvent({event:'run_started', run: msg.run_id});
@@ -484,88 +389,12 @@ function handleWsMessage(msg){
     activeRuns = {};
     renderRuns();
   } else {
+    // ignore saved file payloads (we removed Outputs to reduce client load)
     logEvent(msg);
   }
 }
 
-/* ========== Files UI ========== */
-function renderFiles(){
-  const container = document.getElementById('files');
-  const q = document.getElementById('q').value.trim().toLowerCase();
-  const sort = document.getElementById('sort').value;
-  container.innerHTML = '';
-  let list = Array.from(filesIndex.values());
-  if(q){
-    list = list.filter(it => (it.name && it.name.toLowerCase().includes(q)) || (it.url && it.url.toLowerCase().includes(q)) || (it.title && it.title.toLowerCase().includes(q)));
-  }
-  if(sort === 'new') list.sort((a,b)=> b.ts - a.ts); else list.sort((a,b)=> a.ts - b.ts);
-
-  // build fragment for efficient DOM update
-  const frag = document.createDocumentFragment();
-  for(const it of list){
-    const div = document.createElement('div'); div.className = 'file-item';
-    const meta = document.createElement('div'); meta.className = 'file-meta';
-    const actions = document.createElement('div'); actions.className = 'file-actions';
-    meta.innerHTML = `<div class="fname">${escapeHtml(it.name)}</div>
-                      <div class="ftitle">${escapeHtml(it.title || '')}</div>
-                      <div class="small muted">Source: <a href="${escapeHtml(it.url||'#')}" target="_blank">${escapeHtml(it.url||'')}</a></div>
-                      <div class="small muted">Branch: ${escapeHtml(it.branch || '')}</div>`;
-    if(it.content_preview){
-      const pre = document.createElement('pre');
-      pre.className = 'preview';
-      pre.innerText = it.content_preview;
-      meta.appendChild(pre);
-    }
-    const a = document.createElement('a'); a.href = `${API}/output/${encodeName(it.name)}`; a.target='_blank'; a.innerText='Download'; a.className='ghost';
-    const btnCopy = document.createElement('button'); btnCopy.innerText='Copy'; btnCopy.className='ghost';
-    btnCopy.onclick = ()=>{ navigator.clipboard.writeText(it.content_preview || '').then(()=> toast('Copied')); };
-
-    const btnShowLog = document.createElement('button'); btnShowLog.innerText='Log'; btnShowLog.className='ghost';
-    btnShowLog.onclick = ()=> fetchLogForFile(it.name);
-
-    // Open (lazy load full content)
-    const btnOpen = document.createElement('button'); btnOpen.innerText='Open'; btnOpen.className='ghost';
-    btnOpen.onclick = async ()=> {
-      await openFullContentModal(it.name, it);
-    };
-
-    actions.appendChild(a); actions.appendChild(btnOpen); actions.appendChild(btnCopy); actions.appendChild(btnShowLog);
-    div.appendChild(meta); div.appendChild(actions);
-    frag.appendChild(div);
-  }
-  container.appendChild(frag);
-}
-
-/* Lazy fetch + preview modal */
-async function openFullContentModal(name, it){
-  const previewModal = document.getElementById('previewModal');
-  const previewBody = document.getElementById('previewBody');
-  const previewTitle = document.getElementById('previewTitle');
-  const previewDownload = document.getElementById('previewDownload');
-
-  previewTitle.innerText = name;
-  previewBody.innerText = 'Loading...';
-  previewModal.style.display = 'block';
-  document.getElementById('appRoot').setAttribute('aria-hidden', 'true');
-
-  // If server supports /output/:name returning full text, we fetch it.
-  try {
-    const res = await fetch(`${API}/output/${encodeName(name)}`, { headers: defaultHeaders() });
-    if(!res.ok){
-      const txt = await res.text().catch(()=>null);
-      previewBody.innerText = `Failed to load: ${res.status} ${txt || ''}`;
-      return;
-    }
-    const text = await res.text();
-    previewBody.innerText = text.slice(0, MAX_CONTENT_LEN);
-    previewDownload.onclick = ()=> { window.open(`${API}/output/${encodeName(name)}`, '_blank'); };
-  } catch(e){
-    console.warn('openFullContentModal error', e);
-    previewBody.innerText = 'Ошибка загрузки контента';
-  }
-}
-
-/* ========== Directories (branches) UI ========== */
+/* ========== Branches UI ========== */
 async function loadDirs(){
   if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   try{
@@ -576,44 +405,76 @@ async function loadDirs(){
     renderDirs();
   }catch(e){
     console.warn('loadDirs', e);
-    document.getElementById('dirs').innerHTML = '<div class="small muted">Ошибка загрузки веток</div>';
+    const el = document.getElementById('dirs');
+    if(el) el.innerHTML = '<div class="small muted">Ошибка загрузки веток</div>';
   }
 }
 
 function renderDirs(){
   const el = document.getElementById('dirs');
+  if(!el) return;
   el.innerHTML = '';
   if(!dirs || dirs.length === 0){
     el.innerHTML = '<div class="small muted">Нет веток</div>';
     return;
   }
+
+  // apply search & sort
+  const q = (document.getElementById('branch_q')?.value || '').trim().toLowerCase();
+  const sort = document.getElementById('branch_sort')?.value || 'files_desc';
+  let list = dirs.slice();
+  if(q){
+    list = list.filter(d => (d.branch && d.branch.toLowerCase().includes(q)));
+  }
+  if(sort === 'files_desc') list.sort((a,b)=> (b.files||0) - (a.files||0));
+  else if(sort === 'files_asc') list.sort((a,b)=> (a.files||0) - (b.files||0));
+  else if(sort === 'name_az') list.sort((a,b)=> (''+a.branch).localeCompare(b.branch));
+  else if(sort === 'name_za') list.sort((a,b)=> (''+b.branch).localeCompare(a.branch));
+
   const frag = document.createDocumentFragment();
-  dirs.forEach(d=>{
-    const div = document.createElement('div'); div.className='dir-item';
-    const left = document.createElement('div');
-    left.innerHTML = `<div style="font-weight:700">${escapeHtml(d.branch)}</div><div class="dir-meta">${d.files} file(s) • ${Math.round((d.size||0)/1024)} KB</div>`;
-    const right = document.createElement('div');
-    const btnDownload = document.createElement('button'); btnDownload.className='ghost'; btnDownload.innerText='Download zip';
-    btnDownload.onclick = ()=> { window.open(`${API}/download_dir/${encodeName(d.branch)}`, '_blank'); };
-    const btnSelect = document.createElement('button'); btnSelect.className='ghost'; btnSelect.innerText='Select';
+  for(const d of list){
+    const card = document.createElement('div'); card.className = 'branch-card';
+    const title = document.createElement('div'); title.className = 'branch-title'; title.innerText = d.branch || '—';
+    const meta = document.createElement('div'); meta.className = 'branch-meta';
+    const filesPill = document.createElement('span'); filesPill.className = 'branch-pill'; filesPill.innerText = `${d.files || 0} files`;
+    const sizePill = document.createElement('span'); sizePill.className = 'branch-pill'; sizePill.innerText = `${Math.round((d.size||0)/1024)} KB`;
+    const info = document.createElement('div'); info.className = 'branch-meta'; info.appendChild(filesPill); info.appendChild(sizePill);
+
+    const actions = document.createElement('div'); actions.className = 'branch-actions';
+    const btnSelect = document.createElement('button'); btnSelect.className = 'ghost small'; btnSelect.innerText = 'Select';
     btnSelect.onclick = ()=> { selectBranch(d.branch); };
-    right.appendChild(btnSelect); right.appendChild(btnDownload);
-    div.appendChild(left); div.appendChild(right);
-    frag.appendChild(div);
-  });
+    const btnDownload = document.createElement('button'); btnDownload.className = 'ghost small'; btnDownload.innerText = 'Download zip';
+    btnDownload.onclick = ()=> { window.open(`${API}/download_dir/${encodeName(d.branch)}`, '_blank'); };
+    const btnPreview = document.createElement('button'); btnPreview.className = 'plain small'; btnPreview.innerText = 'Open in explorer';
+    btnPreview.onclick = ()=> { window.open(`${API}/dirs?branch=${encodeName(d.branch)}`, '_blank'); };
+
+    actions.appendChild(btnSelect); actions.appendChild(btnDownload); actions.appendChild(btnPreview);
+
+    card.appendChild(title);
+    card.appendChild(info);
+    // optional description line
+    const desc = document.createElement('div'); desc.className='branch-count'; desc.innerText = d.branch || '';
+    card.appendChild(desc);
+    card.appendChild(actions);
+    frag.appendChild(card);
+  }
   el.appendChild(frag);
 }
 
 function selectBranch(branch){
   selectedBranch = branch;
-  document.getElementById('btnDownloadSelected').disabled = false;
-  document.getElementById('btnDownloadSelected').onclick = ()=> { window.open(`${API}/download_dir/${encodeName(branch)}`, '_blank'); };
+  const btn = document.getElementById('btnDownloadSelected');
+  if(btn) {
+    btn.disabled = false;
+    btn.onclick = ()=> { window.open(`${API}/download_dir/${encodeName(branch)}`, '_blank'); };
+  }
   toast('Selected: ' + branch, 1500);
 }
 
 /* ========== Runs UI ========== */
 function renderRuns(){
   const el = document.getElementById('runs');
+  if(!el) return;
   el.innerHTML = '';
   const keys = Object.keys(activeRuns).reverse();
   if(keys.length === 0) el.innerHTML = '<div class="small muted">Нет активных запусков</div>';
@@ -621,10 +482,16 @@ function renderRuns(){
   keys.forEach(id=>{
     const r = activeRuns[id];
     const div = document.createElement('div'); div.className='run-item';
-    const left = document.createElement('div'); left.innerHTML = `<div style="font-weight:700">${escapeHtml(id)}</div><div class="small muted">${escapeHtml(r.start_url||'')}</div>`;
+    const left = document.createElement('div'); left.className='run-left';
+    const dot = document.createElement('div'); dot.className='status-dot ' + (r.finished ? 'status-finished' : 'status-running');
+    const info = document.createElement('div');
+    info.innerHTML = `<div class="branch-strong">${escapeHtml(id)}</div><div class="small muted">${escapeHtml(r.start_url||'')}</div>`;
+    left.appendChild(dot); left.appendChild(info);
     const right = document.createElement('div');
-    const btnStop = document.createElement('button'); btnStop.innerText='Stop'; btnStop.onclick = ()=> stopRun(id);
-    const btnLogs = document.createElement('button'); btnLogs.className='ghost'; btnLogs.innerText='Logs'; btnLogs.onclick = ()=> downloadRunLog(id);
+    const btnStop = document.createElement('button'); btnStop.className='ghost small'; btnStop.innerText='Stop';
+    btnStop.onclick = ()=> stopRun(id);
+    const btnLogs = document.createElement('button'); btnLogs.className='ghost small'; btnLogs.innerText='Logs';
+    btnLogs.onclick = ()=> downloadRunLog(id);
     right.appendChild(btnLogs); right.appendChild(btnStop);
     div.appendChild(left); div.appendChild(right);
     frag.appendChild(div);
@@ -691,28 +558,16 @@ async function stopAll(){
   }
 }
 
-async function fetchLogForFile(fname){
-  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
-  toast('Fetching log...');
-  try{
-    const res = await fetch(`${API}/list`, { headers: defaultHeaders() });
-    const data = await res.json();
-    const logs = (data.files || []).filter(f => f.name.endsWith('.log'));
-    if(logs.length === 0){ toast('No logs found'); return; }
-    const latest = logs[logs.length-1].name;
-    const run_id = latest.replace('.log','');
-    downloadRunLog(run_id);
-  }catch(e){ console.warn(e); toast('Log fetch failed'); }
-}
-
 function downloadRunLog(run_id){
   const url = `${API}/logs/${encodeName(run_id)}`;
   window.open(url, '_blank');
 }
 
-/* ========== Login logic (adapted) ========== */
+/* ========== Login logic ========== */
 function showLoginModal(open = true){
-  document.getElementById('loginModalWrap').style.display = open ? 'block' : 'none';
+  const wrap = document.getElementById('loginModalWrap');
+  if(!wrap) return;
+  wrap.style.display = open ? 'block' : 'none';
   if(open){
     document.getElementById('loginInput').focus();
     document.getElementById('appRoot').setAttribute('aria-hidden', 'true');
@@ -762,9 +617,8 @@ async function handleLogin(){
       saveUser(newUser);
       showLoginModal(false);
       toast('Logged in successfully', 2500);
-      // after login, init WS and load files/dirs
+      // after login, init WS and load dirs
       initWS();
-      await refreshFiles();
       await loadDirs();
     } else {
       errEl.innerText = 'Неправильный логин или пароль';
@@ -787,9 +641,6 @@ function handleLogout(){
   if(!confirm('Выйти?')) return;
   stopWS();
   saveUser(null);
-  filesIndex.clear();
-  filesOrder=[];
-  renderFiles();
   activeRuns = {};
   renderRuns();
   dirs = [];
@@ -801,28 +652,20 @@ function handleLogout(){
 /* ========== UI wiring ========== */
 document.getElementById('btnStart').onclick = ()=> startCrawl(false);
 document.getElementById('btnStartBG').onclick = ()=> startCrawl(true);
-document.getElementById('btnList').onclick = ()=> refreshFiles();
-document.getElementById('btnRefresh').onclick = ()=> { if(!user){ showLoginModal(true); toast('Вход обязателен'); return; } refreshFiles(); loadDirs(); toast('Refreshed'); };
-document.getElementById('clearSearch').onclick = ()=> { document.getElementById('q').value=''; renderFiles(); };
-document.getElementById('q').oninput = debounce(()=> renderFiles(), 200);
-document.getElementById('sort').onchange = ()=> renderFiles();
+document.getElementById('btnRefresh').onclick = ()=> { if(!user){ showLoginModal(true); toast('Вход обязателен'); return; } loadDirs(); toast('Refreshed'); };
 document.getElementById('btnClearLog').onclick = ()=> { document.getElementById('log').innerText=''; };
 document.getElementById('btnDownloadLog').onclick = async ()=> {
   if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   try{
+    // ask backend for logs list (best-effort)
     const res = await fetch(`${API}/list`, { headers: defaultHeaders() });
     const data = await res.json();
-    const logs = (data.files||[]).filter(f=>f.name.endsWith('.log'));
+    const logs = (data.files||[]).filter(f=>f.name && f.name.endsWith('.log'));
     if(logs.length===0){ toast('No logs'); return; }
     const latest = logs[logs.length-1].name.replace('.log','');
     downloadRunLog(latest);
   }catch(e){ toast('err'); }
 };
-document.getElementById('btnShowFiles').onclick = ()=> {
-  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
-  refreshFiles();
-};
-document.getElementById('btnClearOutputs').onclick = ()=> { filesIndex.clear(); filesOrder=[]; renderFiles(); toast('Cleared local list'); };
 document.getElementById('btnStopAll').onclick = ()=> { if(!user){ showLoginModal(true); toast('Вход обязателен'); return; } stopAll(); };
 document.getElementById('toggleTheme').onclick = ()=> {
   if(document.documentElement.classList.contains('light')){ document.documentElement.classList.remove('light'); localStorage.setItem('theme','dark'); } else { document.documentElement.classList.add('light'); localStorage.setItem('theme','light'); }
@@ -830,17 +673,13 @@ document.getElementById('toggleTheme').onclick = ()=> {
 document.getElementById('btnRefreshDirs').onclick = ()=> loadDirs();
 document.getElementById('btnDownloadSelected').onclick = ()=> { if(selectedBranch) window.open(`${API}/download_dir/${encodeName(selectedBranch)}`, '_blank'); };
 
-/* Login buttons */
 document.getElementById('btnLogin').onclick = ()=> showLoginModal(true);
 document.getElementById('loginCancel').onclick = ()=> showLoginModal(false);
 document.getElementById('loginSubmit').onclick = ()=> handleLogin();
 document.getElementById('btnLogout').onclick = ()=> handleLogout();
 
-/* Preview modal buttons */
-document.getElementById('previewClose').onclick = ()=> {
-  document.getElementById('previewModal').style.display='none';
-  document.getElementById('appRoot').setAttribute('aria-hidden','false');
-};
+document.getElementById('branch_q').oninput = debounce(()=> renderDirs(), 200);
+document.getElementById('branch_sort').onchange = ()=> renderDirs();
 
 /* close modal on backdrop click */
 document.getElementById('loginBackdrop').onclick = (e)=> {
@@ -852,31 +691,10 @@ document.getElementById('loginBackdrop').onclick = (e)=> {
 /* ========== Utilities ========== */
 function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
 
-/* ========== Files list refresh ========== */
-async function refreshFiles(){
-  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
-  try{
-    const res = await fetch(`${API}/list`, { headers: defaultHeaders() });
-    if(!res.ok) throw new Error('list failed');
-    const data = await res.json();
-    (data.files || []).forEach(f=>{
-      if(!filesIndex.has(f.name)){
-        filesIndex.set(f.name, { name: f.name, title:'', url:'', content_preview: (f.preview || '').slice(0, PREVIEW_LEN), size: f.size || 0, ts: Date.now(), branch: f.name.includes('/') ? f.name.split('/').slice(0,-1).join('/') : '' });
-      }
-    });
-    filesOrder = Array.from(filesIndex.keys()).sort((a,b)=> filesIndex.get(b).ts - filesIndex.get(a).ts);
-    renderFiles();
-  }catch(e){
-    console.warn('refreshFiles', e);
-    toast('Не удалось загрузить список файлов');
-  }
-}
-
 /* ========== Init: require login on load ========== */
 loadUser();
 if(user && user.apiKey){
   initWS();
-  refreshFiles();
   loadDirs();
 } else {
   showLoginModal(true);
