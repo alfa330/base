@@ -1,138 +1,456 @@
 <!-- static/index.html -->
 <!doctype html>
-<html>
+<html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <title>Async Crawler UI</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Async Crawler — Control</title>
   <style>
-    body { font-family: Inter, Arial; max-width:900px; margin:20px auto; padding:10px;}
-    input, button { padding:8px; margin:4px 0;}
-    .row { display:flex; gap:8px; align-items:center;}
-    .card { border:1px solid #e3e3e3; padding:12px; border-radius:8px; margin:8px 0; }
-    pre { background:#f6f6f6; padding:8px; overflow:auto;}
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#60a5fa; --accent-2:#7c3aed; --text:#e6eef8;
+      --glass: rgba(255,255,255,0.03);
+      --radius:12px;
+    }
+    :root.light{
+      --bg:#f5f7fb; --card:#ffffff; --muted:#667085; --accent:#2563eb; --accent-2:#7c3aed; --text:#0b1220;
+      --glass: rgba(2,6,23,0.03);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%; margin:0; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:linear-gradient(180deg,var(--bg), #071029); color:var(--text); -webkit-font-smoothing:antialiased}
+    .container{max-width:1100px; margin:28px auto; padding:20px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    .sub{color:var(--muted);font-size:13px}
+    .top-actions{display:flex;gap:8px;align-items:center}
+    .card{background:var(--card); padding:14px; border-radius:var(--radius); box-shadow:0 6px 20px rgba(2,6,23,0.5); border:1px solid rgba(255,255,255,0.03)}
+    .grid{display:grid; gap:14px}
+    .cols-3{grid-template-columns: 1.3fr 1fr 0.9fr}
+    .cols-2{grid-template-columns: 1fr 1fr}
+    label{font-size:13px;color:var(--muted)}
+    input[type="text"], input[type="number"], select { width:100%; padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:var(--text) }
+    input[type="checkbox"]{transform:scale(1.1); margin-right:6px}
+    button { background:linear-gradient(90deg,var(--accent),var(--accent-2)); border:none; color:white; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:600 }
+    button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06); color:var(--text); font-weight:600}
+    .row{display:flex;gap:10px;align-items:center}
+    .small{font-size:13px;color:var(--muted)}
+    .muted{color:var(--muted)}
+    #files{max-height:56vh; overflow:auto; display:flex; flex-direction:column; gap:8px; padding-top:8px}
+    .file-item{display:flex; gap:12px; align-items:flex-start; padding:10px; border-radius:10px; background:var(--glass); border:1px solid rgba(255,255,255,0.02)}
+    .file-meta{flex:1}
+    .file-actions{display:flex;gap:8px;align-items:center}
+    .fname{font-weight:700}
+    .ftitle{color:var(--muted); font-size:13px; margin-top:4px}
+    pre.preview{background:rgba(0,0,0,0.12); padding:8px; border-radius:8px; max-height:160px; overflow:auto; margin-top:8px; white-space:pre-wrap}
+    .runs-list{display:flex;flex-direction:column; gap:8px; max-height:40vh; overflow:auto}
+    .run-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:8px;background:var(--glass)}
+    .log-area{height:180px; overflow:auto; background:rgba(0,0,0,0.06); padding:10px; border-radius:8px; font-family:monospace; font-size:12px; color:var(--muted)}
+    .controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .search{display:flex; gap:8px; align-items:center; margin-bottom:8px}
+    .tag{display:inline-block;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.02);font-size:12px;color:var(--muted)}
+    footer{margin-top:18px;color:var(--muted);font-size:13px;text-align:center}
+    .toast{position:fixed;right:20px;bottom:20px;padding:10px 16px;border-radius:10px;background:#111827;color:white;box-shadow:0 6px 20px rgba(2,6,23,0.5)}
+    .btn-danger{background:#ef4444}
+    @media (max-width:980px){
+      .cols-3{grid-template-columns: 1fr}
+    }
   </style>
 </head>
 <body>
-  <h2>Async Crawler — UI</h2>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Async Crawler — Control</h1>
+        <div class="sub">Запускай обход, смотри результаты в реальном времени через WebSocket</div>
+      </div>
+      <div class="top-actions">
+        <div class="small muted">Тек. соединение: <span id="ws_status">—</span></div>
+        <button id="btnRefresh" class="ghost" title="Обновить список файлов">Обновить</button>
+        <button id="toggleTheme" class="ghost">Тёмная/Светлая</button>
+      </div>
+    </header>
 
-  <div class="card">
-    <div><b>Start URL</b></div>
-    <input id="start_url" type="text" placeholder="https://example.com/path" style="width:100%"/>
-    <div class="row">
-      <input id="prefix" type="text" placeholder="Optional path prefix (e.g. /docs)" />
-      <input id="concurrency" type="number" placeholder="concurrency" value="5" style="width:90px" />
-      <label><input id="save_html" type="checkbox" /> save html</label>
-    </div>
-    <div class="row">
-      <button id="btnStart">Start</button>
-      <button id="btnList">List outputs</button>
-    </div>
-    <div id="start_result"></div>
+    <main class="grid cols-3" style="align-items:start">
+      <!-- Left: Start form + Outputs -->
+      <section>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div>
+              <div style="font-weight:700">Start new crawl</div>
+              <div class="small muted">Укажи стартовый URL и опции</div>
+            </div>
+            <div class="tag" id="last_run_info">—</div>
+          </div>
+
+          <div style="display:grid;gap:8px">
+            <label>Start URL
+              <input id="start_url" type="text" placeholder="https://example.com/path" />
+            </label>
+
+            <div style="display:flex;gap:8px">
+              <label style="flex:1">Prefix (optional)
+                <input id="prefix" type="text" placeholder="/docs/path" />
+              </label>
+              <label style="width:120px">Concurrency
+                <input id="concurrency" type="number" value="5" min="1" />
+              </label>
+            </div>
+
+            <div class="row">
+              <label><input id="save_html" type="checkbox" /> Save raw HTML</label>
+              <label class="small muted" style="margin-left:auto">Max preview: <span id="max_preview">20000</span> chars</label>
+            </div>
+
+            <div class="controls" style="margin-top:6px">
+              <button id="btnStart">Start</button>
+              <button id="btnStartBG" class="ghost" title="Start in background">Start (bg)</button>
+              <button id="btnList" class="ghost">List outputs</button>
+            </div>
+
+            <pre id="start_result" class="log-area" style="margin-top:10px"></pre>
+          </div>
+        </div>
+
+        <div style="height:16px"></div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-weight:700">Outputs</div>
+            <div class="small muted">Файлы появляются автоматически</div>
+          </div>
+
+          <div class="search">
+            <input id="q" type="text" placeholder="Поиск по имени или URL" />
+            <select id="sort">
+              <option value="new">Сначала новые</option>
+              <option value="old">Сначала старые</option>
+            </select>
+            <button id="clearSearch" class="ghost">Очистить</button>
+          </div>
+
+          <div id="files" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <!-- Middle: Runs and Logs -->
+      <aside>
+        <div class="card" style="margin-bottom:12px">
+          <div style="font-weight:700;margin-bottom:8px">Active runs</div>
+          <div class="runs-list" id="runs"></div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-weight:700">Event log</div>
+            <div class="small muted">Последние события</div>
+          </div>
+          <div id="log" class="log-area"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="btnClearLog" class="ghost">Очистить</button>
+            <button id="btnDownloadLog" class="ghost">Скачать лог (последний)</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Right: Quick actions & help -->
+      <section>
+        <div class="card" style="margin-bottom:12px">
+          <div style="font-weight:700">Quick actions</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+            <button id="btnShowFiles" class="ghost">Показать все файлы</button>
+            <button id="btnClearOutputs" class="ghost">Очистить список (локально)</button>
+            <button id="btnStopAll" class="btn-danger">Stop all runs</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="font-weight:700">Help</div>
+          <div class="small muted" style="margin-top:8px">
+            • Запуск стартует краулер на сервере. <br>
+            • Каждая сохранённая страница пушится на фронт через WebSocket и отображается в Outputs. <br>
+            • Клик по «Download» скачает JSON файл с сервера.
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      Crawler UI — простой интерфейс. Разворачивай, тестируй, улучшай.
+    </footer>
   </div>
 
-  <div class="card">
-    <div><b>Active runs</b></div>
-    <div id="runs"></div>
-  </div>
-
-  <div class="card">
-    <div><b>Outputs</b></div>
-    <div id="files"></div>
-  </div>
-
-  <div class="card">
-    <div><b>Logs / Last events</b></div>
-    <pre id="log" style="height:220px"></pre>
-  </div>
+  <div id="toast" class="toast" style="display:none"></div>
 
 <script>
-const api = (path, opts) => fetch('/api' + path, opts);
+/* ========== CONFIG ========== */
+const API = '/api';
+const WS_PATH = '/ws';
+const MAX_CONTENT_LEN = 20000; // keep synced with server-side
+let ws = null;
+let reconnectTimer = null;
+let activeRuns = {}; // run_id -> meta
+let filesIndex = new Map(); // filename -> item
+let filesOrder = []; // filenames sorted
+let theme = localStorage.getItem('theme') || 'dark';
+if(theme === 'light') document.documentElement.classList.add('light'); else document.documentElement.classList.remove('light');
+document.getElementById('max_preview').innerText = MAX_CONTENT_LEN;
 
-// WebSocket
-let ws;
-function initWS(){
-  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
-  ws.onopen = () => {
-    console.log("WS connected");
-    // send occasional ping to keep alive
-    setInterval(()=> {
-      try { ws.send("ping"); } catch(e) {}
-    }, 20000);
-  };
-  ws.onmessage = (ev) => {
-    try {
-      // backend sometimes sends plain text ack; handle only JSON
-      let msg;
-      try { msg = JSON.parse(ev.data); } catch(e) { /* not JSON */ return; }
-      handleWsMessage(msg);
-    } catch (e) { console.error("ws parse error", e); }
-  };
-  ws.onclose = () => {
-    console.log("WS closed — reconnect in 3s");
-    setTimeout(initWS, 3000);
-  };
-  ws.onerror = (e) => console.warn("WS error", e);
+/* ========== HELPERS ========== */
+function toast(text, ms=3000){
+  const t = document.getElementById('toast');
+  t.innerText = text;
+  t.style.display = 'block';
+  clearTimeout(t._h);
+  t._h = setTimeout(()=> t.style.display='none', ms);
 }
-
-function handleWsMessage(msg){
-  // example msg: {"run_id":"...", "type":"saved", "index":1, "url":"...", "file":"00001_page_abc.json", "title":"...","content":"..."}
-  const t = msg.type || "event";
-  if (t === "saved") {
-    addFileToUI(msg);
-  } else if (t === "run_started") {
-    const el = document.getElementById('start_result');
-    el.innerText = `Run started: ${msg.run_id} ${msg.start_url || ""}`;
-  } else if (t === "finished") {
-    // optional handling
-    console.log("run finished", msg);
-  } else {
-    // generic push: show in logs
-    const pre = document.getElementById('log');
-    pre.innerText += JSON.stringify(msg, null, 2) + "\n";
-  }
+function logEvent(obj){
+  const el = document.getElementById('log');
+  const ts = (new Date()).toLocaleTimeString();
+  el.innerText = `${ts} — ${JSON.stringify(obj)}\n` + el.innerText;
 }
-
-// append file info to UI
-function addFileToUI(item){
-  const filesEl = document.getElementById('files');
-  const name = item.file || item.name || ("item_" + Date.now());
-  const div = document.createElement('div');
-  div.style.margin = '8px 0';
-  const kb = item.size ? Math.round(item.size/1024) + 'KB' : '';
-  let contentPreview = "";
-  if (item.content) {
-    contentPreview = `<pre style="max-height:180px;overflow:auto;margin-top:6px;">${escapeHtml(item.content)}</pre>`;
-  }
-  div.innerHTML = `<strong>${escapeHtml(name)}</strong> ${kb} — <a href="/api/output/${encodeURIComponent(name)}" target="_blank">Download</a>
-    <div>Source: <a href="${escapeHtml(item.url||'#')}" target="_blank">${escapeHtml(item.url||'')}</a></div>
-    ${contentPreview}
-  `;
-  filesEl.prepend(div);
-  // also update logs area
-  const pre = document.getElementById('log');
-  pre.innerText = `Saved: ${name}\n` + (pre.innerText || "");
-}
-
 function escapeHtml(s){
-  if (!s) return "";
-  return s.replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]); });
+  if(!s) return '';
+  return s.replace(/[&<>"'`]/g, (m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[m]));
+}
+function encodeName(n){ return encodeURIComponent(n); }
+
+/* ========== WS ========== */
+function initWS(){
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const uri = `${proto}//${location.host}${WS_PATH}`;
+  ws = new WebSocket(uri);
+  updateWsStatus('connecting');
+  ws.onopen = () => { updateWsStatus('connected'); toast('WS connected'); pingLoop(); };
+  ws.onmessage = (ev) => {
+    // backend might send raw 'ack' text; try parse json
+    let msg = null;
+    try { msg = JSON.parse(ev.data); } catch(e){ return; }
+    handleWsMessage(msg);
+  };
+  ws.onclose = () => { updateWsStatus('disconnected'); toast('WS disconnected — reconnecting'); scheduleReconnect(); };
+  ws.onerror = (e) => { updateWsStatus('error'); console.warn('ws error', e); };
+}
+function scheduleReconnect(){ if(reconnectTimer) return; reconnectTimer = setTimeout(()=>{ reconnectTimer=null; initWS(); }, 3000); }
+function updateWsStatus(s){
+  const el = document.getElementById('ws_status');
+  el.innerText = s;
 }
 
-// wire start button (keeps previous behavior)
-document.getElementById('btnStart').onclick = async () => {
+/* send periodic ping to keep connection alive */
+let _pingInterval = null;
+function pingLoop(){
+  if(_pingInterval) clearInterval(_pingInterval);
+  _pingInterval = setInterval(()=>{ try{ ws && ws.send('ping'); }catch(e){} }, 20000);
+}
+
+/* ========== WS message handling ========== */
+function handleWsMessage(msg){
+  // normalize
+  const type = msg.type || msg.event || 'event';
+  if(type === 'saved'){
+    // server should send: { run_id, type:'saved', file, url, title, content }
+    addOrUpdateFile(msg);
+    logEvent({event:'saved', file: msg.file, run: msg.run_id});
+  } else if(type === 'run_started' || type === 'started'){
+    activeRuns[msg.run_id] = { start_url: msg.start_url || msg.start_url, ts: Date.now() };
+    renderRuns();
+    logEvent({event:'run_started', run: msg.run_id});
+  } else if(type === 'stopping'){
+    logEvent({event:'stopping', run: msg.run_id});
+  } else if(type === 'finished'){
+    logEvent({event:'finished', run: msg.run_id});
+    if(activeRuns[msg.run_id]) activeRuns[msg.run_id].finished = true;
+    renderRuns();
+  } else {
+    // generic
+    logEvent(msg);
+  }
+}
+
+/* ========== Files UI ========== */
+function addOrUpdateFile(item){
+  const name = item.file;
+  if(!name) return;
+  const now = Date.now();
+  const entry = {
+    name,
+    url: item.url || '',
+    title: item.title || '',
+    content: item.content || '',
+    run_id: item.run_id || '',
+    ts: now
+  };
+  // replace or add
+  filesIndex.set(name, entry);
+  // update order: newest first
+  filesOrder = Array.from(filesIndex.keys()).sort((a,b)=>{
+    return filesIndex.get(b).ts - filesIndex.get(a).ts;
+  });
+  renderFiles();
+}
+
+/* fetch list from server (initial sync / refresh) */
+async function refreshFiles(){
+  try{
+    const res = await fetch(`${API}/list`);
+    if(!res.ok) throw new Error('list failed');
+    const data = await res.json();
+    // data.files is array of {name,size,path}
+    (data.files || []).forEach(f=>{
+      if(!filesIndex.has(f.name)){
+        filesIndex.set(f.name, { name: f.name, title:'', url:'', content:'', size: f.size || 0, ts: Date.now() });
+      }
+    });
+    filesOrder = Array.from(filesIndex.keys()).sort((a,b)=> filesIndex.get(b).ts - filesIndex.get(a).ts);
+    renderFiles();
+  }catch(e){
+    console.warn('refreshFiles', e);
+  }
+}
+
+function renderFiles(){
+  const container = document.getElementById('files');
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const sort = document.getElementById('sort').value;
+  container.innerHTML = '';
+  let list = Array.from(filesIndex.values());
+  if(q){
+    list = list.filter(it => (it.name && it.name.toLowerCase().includes(q)) || (it.url && it.url.toLowerCase().includes(q)) || (it.title && it.title.toLowerCase().includes(q)));
+  }
+  if(sort === 'new') list.sort((a,b)=> b.ts - a.ts); else list.sort((a,b)=> a.ts - b.ts);
+  for(const it of list){
+    const div = document.createElement('div'); div.className = 'file-item';
+    const meta = document.createElement('div'); meta.className = 'file-meta';
+    const actions = document.createElement('div'); actions.className = 'file-actions';
+    meta.innerHTML = `<div class="fname">${escapeHtml(it.name)}</div>
+                      <div class="ftitle">${escapeHtml(it.title || '')}</div>
+                      <div class="small muted">Source: <a href="${escapeHtml(it.url||'#')}" target="_blank">${escapeHtml(it.url||'')}</a></div>`;
+    if(it.content){
+      const pre = document.createElement('pre');
+      pre.className = 'preview';
+      pre.innerText = it.content;
+      meta.appendChild(pre);
+    }
+    const a = document.createElement('a'); a.href = `${API}/output/${encodeName(it.name)}`; a.target='_blank'; a.innerText='Download'; a.className='ghost';
+    const btnCopy = document.createElement('button'); btnCopy.innerText='Copy'; btnCopy.className='ghost';
+    btnCopy.onclick = ()=>{ navigator.clipboard.writeText(it.content || '').then(()=> toast('Copied')); };
+    const btnShowLog = document.createElement('button'); btnShowLog.innerText='Log'; btnShowLog.className='ghost';
+    btnShowLog.onclick = ()=> fetchLogForFile(it.name);
+    actions.appendChild(a); actions.appendChild(btnCopy); actions.appendChild(btnShowLog);
+    div.appendChild(meta); div.appendChild(actions);
+    container.appendChild(div);
+  }
+}
+
+/* ========== Runs UI ========== */
+function renderRuns(){
+  const el = document.getElementById('runs');
+  el.innerHTML = '';
+  const keys = Object.keys(activeRuns).reverse();
+  if(keys.length === 0) el.innerHTML = '<div class="small muted">Нет активных запусков</div>';
+  keys.forEach(id=>{
+    const r = activeRuns[id];
+    const div = document.createElement('div'); div.className='run-item';
+    const left = document.createElement('div'); left.innerHTML = `<div style="font-weight:700">${escapeHtml(id)}</div><div class="small muted">${escapeHtml(r.start_url||'')}</div>`;
+    const right = document.createElement('div');
+    const btnStop = document.createElement('button'); btnStop.innerText='Stop'; btnStop.onclick = ()=> stopRun(id);
+    const btnLogs = document.createElement('button'); btnLogs.className='ghost'; btnLogs.innerText='Logs'; btnLogs.onclick = ()=> downloadRunLog(id);
+    right.appendChild(btnLogs); right.appendChild(btnStop);
+    div.appendChild(left); div.appendChild(right);
+    el.appendChild(div);
+  });
+}
+
+/* ========== API actions ========== */
+async function startCrawl(bg=false){
   const start_url = document.getElementById('start_url').value.trim();
-  if (!start_url) return alert('Укажи start_url');
+  if(!start_url) return alert('Укажи start_url');
   const prefix = document.getElementById('prefix').value || null;
-  const concurrency = parseInt(document.getElementById('concurrency').value || '5', 10);
+  const concurrency = parseInt(document.getElementById('concurrency').value||'5',10);
   const save_html = document.getElementById('save_html').checked;
   const body = { start_url, prefix, concurrency, save_html };
-  const res = await api('/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-  const data = await res.json();
-  document.getElementById('start_result').innerText = JSON.stringify(data, null, 2);
+  try{
+    const res = await fetch(`${API}/start`, { method:'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await res.json();
+    document.getElementById('start_result').innerText = JSON.stringify(data, null, 2);
+    if(data.run_id){
+      activeRuns[data.run_id] = { start_url, ts: Date.now() };
+      renderRuns();
+      toast('Run started: ' + data.run_id);
+      document.getElementById('last_run_info').innerText = data.run_id;
+    }
+  }catch(e){ console.error(e); toast('Start failed'); }
+}
+
+async function stopRun(run_id){
+  if(!confirm('Остановить run ' + run_id + '?')) return;
+  try{
+    const res = await fetch(`${API}/stop/${encodeURIComponent(run_id)}`, { method:'POST' });
+    if(res.ok){
+      toast('Stopping ' + run_id);
+      delete activeRuns[run_id];
+      renderRuns();
+    } else toast('Stop failed');
+  } catch(e){ toast('Stop error'); }
+}
+
+async function stopAll(){
+  const keys = Object.keys(activeRuns);
+  for(const k of keys) await stopRun(k);
+}
+
+async function fetchLogForFile(fname){
+  // try find run_id prefix in filename (not guaranteed). Otherwise show recent logs.
+  toast('Fetching log...');
+  try{
+    // list available log files and try show the newest
+    const res = await fetch(`${API}/list`);
+    const data = await res.json();
+    const logs = (data.files || []).filter(f => f.name.endsWith('.log'));
+    if(logs.length === 0){ toast('No logs found'); return; }
+    const latest = logs[logs.length-1].name;
+    const run_id = latest.replace('.log','');
+    downloadRunLog(run_id);
+  }catch(e){ console.warn(e); toast('Log fetch failed'); }
+}
+
+function downloadRunLog(run_id){
+  const url = `${API}/logs/${encodeURIComponent(run_id)}`;
+  window.open(url, '_blank');
+}
+
+/* ========== UI wiring ========== */
+document.getElementById('btnStart').onclick = ()=> startCrawl(false);
+document.getElementById('btnStartBG').onclick = ()=> startCrawl(true);
+document.getElementById('btnList').onclick = ()=> refreshFiles();
+document.getElementById('btnRefresh').onclick = ()=> { refreshFiles(); toast('Refreshed'); };
+document.getElementById('clearSearch').onclick = ()=> { document.getElementById('q').value=''; renderFiles(); };
+document.getElementById('q').oninput = ()=> renderFiles();
+document.getElementById('sort').onchange = ()=> renderFiles();
+document.getElementById('btnClearLog').onclick = ()=> { document.getElementById('log').innerText=''; };
+document.getElementById('btnDownloadLog').onclick = async ()=> {
+  try{
+    const res = await fetch(`${API}/list`);
+    const data = await res.json();
+    const logs = (data.files||[]).filter(f=>f.name.endsWith('.log'));
+    if(logs.length===0){ toast('No logs'); return; }
+    const latest = logs[logs.length-1].name.replace('.log','');
+    downloadRunLog(latest);
+  }catch(e){ toast('err'); }
+};
+document.getElementById('btnShowFiles').onclick = ()=> refreshFiles();
+document.getElementById('btnClearOutputs').onclick = ()=> { filesIndex.clear(); filesOrder=[]; renderFiles(); toast('Cleared local list'); };
+document.getElementById('btnStopAll').onclick = ()=> { if(confirm('Stop all runs?')) stopAll(); };
+document.getElementById('toggleTheme').onclick = ()=> {
+  if(document.documentElement.classList.contains('light')){ document.documentElement.classList.remove('light'); localStorage.setItem('theme','dark'); } else { document.documentElement.classList.add('light'); localStorage.setItem('theme','light'); }
 };
 
-// init
+/* ========== Init ========= */
 initWS();
+refreshFiles();
+
+/* reconnect safety: if ws doesn't connect in 3s, try again */
+setTimeout(()=>{ if(!ws || ws.readyState !== WebSocket.OPEN) initWS(); }, 3000);
+
 </script>
 </body>
 </html>

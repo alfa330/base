@@ -94,17 +94,14 @@ class StartRequest(BaseModel):
 def status_logger_factory(run_id: str):
     def cb(status: dict):
         lf = OUTPUT_DIR / f"{run_id}.log"
-        # append to file
         try:
             with lf.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(status, ensure_ascii=False) + "\n")
         except Exception:
             pass
-        # also broadcast to websockets (fire-and-forget)
         try:
-            # include run_id to let frontend filter by run
             payload = {"run_id": run_id, **status}
-            # schedule broadcast on event loop to avoid blocking sync file write
+            # Не блокируем основной поток — отправляем асинхронно
             asyncio.get_event_loop().create_task(ws_manager.broadcast_json(payload))
         except Exception:
             pass

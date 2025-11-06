@@ -213,6 +213,7 @@ class AsyncCrawler:
         self.index += 1
         fname = make_safe_filename(self.index, url, title)
         out_path = self.output_dir / fname
+        # write json and md asynchronously
         async with aiofiles.open(out_path, mode="w", encoding="utf-8") as f:
             await f.write(json.dumps(data, ensure_ascii=False, indent=2))
 
@@ -224,8 +225,26 @@ class AsyncCrawler:
             await f.write(data.get("content", ""))
 
         logging.info(f"Saved [{self.index}] {url} -> {out_path.name}")
+        if self.pbar:
+            self.pbar.update(1)
+
+        # --- realtime push to UI via status_callback ---
         if self.status_callback:
-            self.status_callback({"type": "saved", "index": self.index, "url": url, "file": out_path.name})
+            try:
+                # Ограничиваем размер content, чтобы не перегружать WS
+                MAX_CONTENT_LEN = 20_000
+                payload = {
+                    "type": "saved",
+                    "index": self.index,
+                    "file": out_path.name,
+                    "url": url,
+                    "title": title,
+                    "content": content[:MAX_CONTENT_LEN],
+                }
+                # если callback синхронный — он должен принять dict; в main.py он запланирует broadcast
+                self.status_callback(payload)
+            except Exception:
+                logging.exception("status_callback failed after saving file")
 
     async def worker(self, session: aiohttp.ClientSession):
         while not self._stop_event.is_set():
