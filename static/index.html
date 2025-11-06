@@ -1,10 +1,10 @@
-<!-- static/index.html (with login) -->
+<!-- static/index.html (login required) -->
 <!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Async Crawler — Control</title>
+  <title>Async Crawler — Control (auth required)</title>
   <style>
     :root{
       --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#60a5fa; --accent-2:#7c3aed; --text:#e6eef8;
@@ -31,6 +31,7 @@
     input[type="checkbox"]{transform:scale(1.1); margin-right:6px}
     button { background:linear-gradient(90deg,var(--accent),var(--accent-2)); border:none; color:white; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:600 }
     button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06); color:var(--text); font-weight:600}
+    button:disabled, .ghost[disabled]{opacity:0.45;cursor:not-allowed}
     .row{display:flex;gap:10px;align-items:center}
     .small{font-size:13px;color:var(--muted)}
     .muted{color:var(--muted)}
@@ -48,10 +49,10 @@
     .search{display:flex; gap:8px; align-items:center; margin-bottom:8px}
     .tag{display:inline-block;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.02);font-size:12px;color:var(--muted)}
     footer{margin-top:18px;color:var(--muted);font-size:13px;text-align:center}
-    .toast{position:fixed;right:20px;bottom:20px;padding:10px 16px;border-radius:10px;background:#111827;color:white;box-shadow:0 6px 20px rgba(2,6,23,0.5)}
+    .toast{position:fixed;right:20px;bottom:20px;padding:10px 16px;border-radius:10px;background:#111827;color:white;box-shadow:0 6px 20px rgba(2,6,23,0.5);z-index:80}
     .btn-danger{background:#ef4444}
     /* login modal */
-    .modal-backdrop{position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:60}
+    .modal-backdrop{position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:100}
     .modal{width:360px;background:var(--card);padding:16px;border-radius:12px;box-shadow:0 10px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.04)}
     .modal h3{margin:0 0 8px 0}
     .modal .error{color:#f87171;margin-top:8px}
@@ -64,7 +65,7 @@
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="container" id="appRoot" aria-hidden="false">
     <header>
       <div>
         <h1>Async Crawler — Control</h1>
@@ -114,9 +115,9 @@
             </div>
 
             <div class="controls" style="margin-top:6px">
-              <button id="btnStart">Start</button>
-              <button id="btnStartBG" class="ghost" title="Start in background">Start (bg)</button>
-              <button id="btnList" class="ghost">List outputs</button>
+              <button id="btnStart" disabled>Start</button>
+              <button id="btnStartBG" class="ghost" title="Start in background" disabled>Start (bg)</button>
+              <button id="btnList" class="ghost" disabled>List outputs</button>
             </div>
 
             <pre id="start_result" class="log-area" style="margin-top:10px"></pre>
@@ -159,7 +160,7 @@
           <div id="log" class="log-area"></div>
           <div style="display:flex;gap:8px;margin-top:8px">
             <button id="btnClearLog" class="ghost">Очистить</button>
-            <button id="btnDownloadLog" class="ghost">Скачать лог (последний)</button>
+            <button id="btnDownloadLog" class="ghost" disabled>Скачать лог (последний)</button>
           </div>
         </div>
       </aside>
@@ -169,9 +170,9 @@
         <div class="card" style="margin-bottom:12px">
           <div style="font-weight:700">Quick actions</div>
           <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-            <button id="btnShowFiles" class="ghost">Показать все файлы</button>
+            <button id="btnShowFiles" class="ghost" disabled>Показать все файлы</button>
             <button id="btnClearOutputs" class="ghost">Очистить список (локально)</button>
-            <button id="btnStopAll" class="btn-danger">Stop all runs</button>
+            <button id="btnStopAll" class="btn-danger" disabled>Stop all runs</button>
           </div>
         </div>
 
@@ -193,12 +194,12 @@
 
   <div id="toast" class="toast" style="display:none"></div>
 
-  <!-- Login modal (hidden by default) -->
+  <!-- Login modal (shown automatically, required) -->
   <div id="loginModalWrap" style="display:none">
-    <div class="modal-backdrop" id="loginBackdrop">
+    <div class="modal-backdrop" id="loginBackdrop" aria-hidden="false">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
-        <h3 id="loginTitle">Вход</h3>
-        <div class="mini muted">Войдите, чтобы получить дополнительные права и API-ключ</div>
+        <h3 id="loginTitle">Вход (обязательно)</h3>
+        <div class="mini muted">Войдите, чтобы управлять краулером. Без входа интерфейс недоступен.</div>
         <div style="margin-top:12px">
           <label>Логин
             <input id="loginInput" type="text" autocomplete="username" />
@@ -218,23 +219,25 @@
 
 <script>
 /* ========== CONFIG ========== */
-const API = '/api'; // local crawler backend
-const API_BASE_URL = 'https://otp-2-fos4.onrender.com'; // external auth service (as provided)
+const API = '/api'; // local crawler backend (requires x-api-key)
+const API_BASE_URL = 'https://otp-2-fos4.onrender.com'; // external auth service (provided)
 const WS_PATH = '/ws';
-const MAX_CONTENT_LEN = 20000; // keep synced with server-side
+const MAX_CONTENT_LEN = 20000;
 
 /* ========== STATE ========== */
 let ws = null;
 let reconnectTimer = null;
+let pingInterval = null;
 let activeRuns = {}; // run_id -> meta
-let filesIndex = new Map(); // filename -> item
-let filesOrder = []; // filenames sorted
+let filesIndex = new Map();
+let filesOrder = [];
 let theme = localStorage.getItem('theme') || 'dark';
 if(theme === 'light') document.documentElement.classList.add('light'); else document.documentElement.classList.remove('light');
 document.getElementById('max_preview').innerText = MAX_CONTENT_LEN;
 
-/* User state (persisted) */
-let user = null;
+let user = null; // {role,id,name,telegram_id,apiKey}
+
+/* ========== USER STORAGE & UI ========== */
 function loadUser(){
   try{
     const raw = localStorage.getItem('crawler_user');
@@ -251,14 +254,38 @@ function updateUserUI(){
   const userName = document.getElementById('userName');
   const btnLogin = document.getElementById('btnLogin');
   const btnLogout = document.getElementById('btnLogout');
+  const startBtn = document.getElementById('btnStart');
+  const startBG = document.getElementById('btnStartBG');
+  const listBtn = document.getElementById('btnList');
+  const refreshBtn = document.getElementById('btnRefresh');
+  const showFilesBtn = document.getElementById('btnShowFiles');
+  const stopAllBtn = document.getElementById('btnStopAll');
+  const downloadLogBtn = document.getElementById('btnDownloadLog');
+
   if(user && user.name){
     userName.innerText = user.name + (user.role ? ` (${user.role})` : '');
     btnLogin.style.display = 'none';
     btnLogout.style.display = 'inline-flex';
+    // enable actions
+    startBtn.disabled = false;
+    startBG.disabled = false;
+    listBtn.disabled = false;
+    refreshBtn.disabled = false;
+    showFilesBtn.disabled = false;
+    stopAllBtn.disabled = false;
+    downloadLogBtn.disabled = false;
   } else {
     userName.innerText = '—';
     btnLogin.style.display = 'inline-flex';
     btnLogout.style.display = 'none';
+    // disable actions
+    startBtn.disabled = true;
+    startBG.disabled = true;
+    listBtn.disabled = true;
+    refreshBtn.disabled = true;
+    showFilesBtn.disabled = true;
+    stopAllBtn.disabled = true;
+    downloadLogBtn.disabled = true;
   }
 }
 
@@ -281,13 +308,26 @@ function escapeHtml(s){
 }
 function encodeName(n){ return encodeURIComponent(n); }
 
-/* ========== WS ========== */
+function defaultHeaders(){
+  const headers = { 'Accept': 'application/json' };
+  if(user && user.apiKey){
+    headers['x-api-key'] = user.apiKey;
+  }
+  return headers;
+}
+
+/* ========== WS (only after login) ========== */
 function initWS(){
+  if(!user || !user.apiKey){
+    console.warn('WS init attempted without user apiKey');
+    return;
+  }
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const uri = `${proto}//${location.host}${WS_PATH}`;
+  // pass apiKey in query param because browser WebSocket cannot set custom headers
+  const uri = `${proto}//${location.host}${WS_PATH}?key=${encodeURIComponent(user.apiKey)}`;
   ws = new WebSocket(uri);
   updateWsStatus('connecting');
-  ws.onopen = () => { updateWsStatus('connected'); toast('WS connected'); pingLoop(); };
+  ws.onopen = () => { updateWsStatus('connected'); toast('WS connected'); startPing(); };
   ws.onmessage = (ev) => {
     let msg = null;
     try { msg = JSON.parse(ev.data); } catch(e){ return; }
@@ -296,18 +336,10 @@ function initWS(){
   ws.onclose = () => { updateWsStatus('disconnected'); toast('WS disconnected — reconnecting'); scheduleReconnect(); };
   ws.onerror = (e) => { updateWsStatus('error'); console.warn('ws error', e); };
 }
-function scheduleReconnect(){ if(reconnectTimer) return; reconnectTimer = setTimeout(()=>{ reconnectTimer=null; initWS(); }, 3000); }
-function updateWsStatus(s){
-  const el = document.getElementById('ws_status');
-  el.innerText = s;
-}
-
-/* send periodic ping to keep connection alive */
-let _pingInterval = null;
-function pingLoop(){
-  if(_pingInterval) clearInterval(_pingInterval);
-  _pingInterval = setInterval(()=>{ try{ ws && ws.send('ping'); }catch(e){} }, 20000);
-}
+function scheduleReconnect(){ if(reconnectTimer) return; reconnectTimer = setTimeout(()=>{ reconnectTimer=null; if(user && user.apiKey) initWS(); }, 3000); }
+function updateWsStatus(s){ const el = document.getElementById('ws_status'); el.innerText = s; }
+function startPing(){ if(pingInterval) clearInterval(pingInterval); pingInterval = setInterval(()=>{ try{ ws && ws.send('ping'); }catch(e){} }, 20000); }
+function stopWS(){ try{ if(pingInterval) clearInterval(pingInterval); pingInterval=null; if(ws){ ws.close(); ws=null; } updateWsStatus('stopped'); }catch(e){} }
 
 /* ========== WS message handling ========== */
 function handleWsMessage(msg){
@@ -344,13 +376,12 @@ function addOrUpdateFile(item){
     ts: now
   };
   filesIndex.set(name, entry);
-  filesOrder = Array.from(filesIndex.keys()).sort((a,b)=>{
-    return filesIndex.get(b).ts - filesIndex.get(a).ts;
-  });
+  filesOrder = Array.from(filesIndex.keys()).sort((a,b)=> filesIndex.get(b).ts - filesIndex.get(a).ts );
   renderFiles();
 }
 
 async function refreshFiles(){
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   try{
     const res = await fetch(`${API}/list`, { headers: defaultHeaders() });
     if(!res.ok) throw new Error('list failed');
@@ -364,6 +395,7 @@ async function refreshFiles(){
     renderFiles();
   }catch(e){
     console.warn('refreshFiles', e);
+    toast('Не удалось загрузить список файлов');
   }
 }
 
@@ -420,18 +452,9 @@ function renderRuns(){
   });
 }
 
-/* ========== API helpers and actions ========== */
-function defaultHeaders(){
-  const headers = { 'Accept': 'application/json' };
-  if(user && user.apiKey){
-    headers['x-api-key'] = user.apiKey;
-    // some APIs use Authorization: Bearer <key> — change if needed
-    // headers['Authorization'] = `Bearer ${user.apiKey}`;
-  }
-  return headers;
-}
-
+/* ========== API actions ========== */
 async function startCrawl(bg=false){
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   const start_url = document.getElementById('start_url').value.trim();
   if(!start_url) return alert('Укажи start_url');
   const prefix = document.getElementById('prefix').value || null;
@@ -440,6 +463,10 @@ async function startCrawl(bg=false){
   const body = { start_url, prefix, concurrency, save_html, bg };
   try{
     const res = await fetch(`${API}/start`, { method:'POST', headers: Object.assign({'Content-Type':'application/json'}, defaultHeaders()), body: JSON.stringify(body) });
+    if(!res.ok) {
+      const txt = await res.text().catch(()=>null);
+      throw new Error(txt || 'start failed');
+    }
     const data = await res.json();
     document.getElementById('start_result').innerText = JSON.stringify(data, null, 2);
     if(data.run_id){
@@ -452,6 +479,7 @@ async function startCrawl(bg=false){
 }
 
 async function stopRun(run_id){
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   if(!confirm('Остановить run ' + run_id + '?')) return;
   try{
     const res = await fetch(`${API}/stop/${encodeURIComponent(run_id)}`, { method:'POST', headers: defaultHeaders() });
@@ -459,16 +487,20 @@ async function stopRun(run_id){
       toast('Stopping ' + run_id);
       delete activeRuns[run_id];
       renderRuns();
-    } else toast('Stop failed');
+    } else {
+      toast('Stop failed');
+    }
   } catch(e){ toast('Stop error'); }
 }
 
 async function stopAll(){
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   const keys = Object.keys(activeRuns);
   for(const k of keys) await stopRun(k);
 }
 
 async function fetchLogForFile(fname){
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   toast('Fetching log...');
   try{
     const res = await fetch(`${API}/list`, { headers: defaultHeaders() });
@@ -486,15 +518,18 @@ function downloadRunLog(run_id){
   window.open(url, '_blank');
 }
 
-/* ========== Login logic (adapted from provided code) ========== */
+/* ========== Login logic (adapted) ========== */
 function showLoginModal(open = true){
   document.getElementById('loginModalWrap').style.display = open ? 'block' : 'none';
   if(open){
     document.getElementById('loginInput').focus();
+    // when modal open, prevent interacting with app content by aria-hidden attr
+    document.getElementById('appRoot').setAttribute('aria-hidden', 'true');
   } else {
     document.getElementById('loginError').style.display = 'none';
     document.getElementById('loginInput').value = '';
     document.getElementById('passwordInput').value = '';
+    document.getElementById('appRoot').setAttribute('aria-hidden', 'false');
   }
 }
 
@@ -523,7 +558,6 @@ async function handleLogin(){
     }
     const data = await response.json();
     if (data.status === 'success') {
-      // expected fields: role, id, name, telegram_id, apiKey
       const newUser = {
         role: data.role || null,
         id: data.id || null,
@@ -531,12 +565,15 @@ async function handleLogin(){
         telegram_id: data.telegram_id || null,
         apiKey: data.apiKey || data.api_key || null
       };
+      if(!newUser.apiKey){
+        throw new Error('API key not returned by auth server');
+      }
       saveUser(newUser);
       showLoginModal(false);
-      toast('Logged in successfully', 3000);
-      // clear fields
-      document.getElementById('loginInput').value = '';
-      document.getElementById('passwordInput').value = '';
+      toast('Logged in successfully', 2500);
+      // after login, init WS and load files
+      initWS();
+      await refreshFiles();
     } else {
       errEl.innerText = 'Неправильный логин или пароль';
       errEl.style.display = 'block';
@@ -556,20 +593,29 @@ async function handleLogin(){
 
 function handleLogout(){
   if(!confirm('Выйти?')) return;
+  stopWS();
   saveUser(null);
+  filesIndex.clear();
+  filesOrder=[];
+  renderFiles();
+  activeRuns = {};
+  renderRuns();
   toast('Logged out', 1500);
+  // require login again
+  setTimeout(()=> showLoginModal(true), 200);
 }
 
 /* ========== UI wiring ========== */
 document.getElementById('btnStart').onclick = ()=> startCrawl(false);
 document.getElementById('btnStartBG').onclick = ()=> startCrawl(true);
 document.getElementById('btnList').onclick = ()=> refreshFiles();
-document.getElementById('btnRefresh').onclick = ()=> { refreshFiles(); toast('Refreshed'); };
+document.getElementById('btnRefresh').onclick = ()=> { if(!user){ showLoginModal(true); toast('Вход обязателен'); return; } refreshFiles(); toast('Refreshed'); };
 document.getElementById('clearSearch').onclick = ()=> { document.getElementById('q').value=''; renderFiles(); };
 document.getElementById('q').oninput = ()=> renderFiles();
 document.getElementById('sort').onchange = ()=> renderFiles();
 document.getElementById('btnClearLog').onclick = ()=> { document.getElementById('log').innerText=''; };
 document.getElementById('btnDownloadLog').onclick = async ()=> {
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   try{
     const res = await fetch(`${API}/list`, { headers: defaultHeaders() });
     const data = await res.json();
@@ -579,9 +625,12 @@ document.getElementById('btnDownloadLog').onclick = async ()=> {
     downloadRunLog(latest);
   }catch(e){ toast('err'); }
 };
-document.getElementById('btnShowFiles').onclick = ()=> refreshFiles();
+document.getElementById('btnShowFiles').onclick = ()=> {
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
+  refreshFiles();
+};
 document.getElementById('btnClearOutputs').onclick = ()=> { filesIndex.clear(); filesOrder=[]; renderFiles(); toast('Cleared local list'); };
-document.getElementById('btnStopAll').onclick = ()=> { if(confirm('Stop all runs?')) stopAll(); };
+document.getElementById('btnStopAll').onclick = ()=> { if(!user){ showLoginModal(true); toast('Вход обязателен'); return; } if(confirm('Stop all runs?')) stopAll(); };
 document.getElementById('toggleTheme').onclick = ()=> {
   if(document.documentElement.classList.contains('light')){ document.documentElement.classList.remove('light'); localStorage.setItem('theme','dark'); } else { document.documentElement.classList.add('light'); localStorage.setItem('theme','light'); }
 };
@@ -594,14 +643,24 @@ document.getElementById('btnLogout').onclick = ()=> handleLogout();
 
 /* close modal on backdrop click */
 document.getElementById('loginBackdrop').onclick = (e)=> {
-  if(e.target === document.getElementById('loginBackdrop')) showLoginModal(false);
+  if(e.target === document.getElementById('loginBackdrop')) {
+    // Do not allow closing modal if not logged in (mandatory)
+    if(user) showLoginModal(false);
+  }
 };
 
-/* ========== Init ========= */
+/* ========== Init: require login on load ========== */
 loadUser();
-initWS();
-refreshFiles();
-setTimeout(()=>{ if(!ws || ws.readyState !== WebSocket.OPEN) initWS(); }, 3000);
+if(user && user.apiKey){
+  // if user already in localStorage, initialize
+  initWS();
+  refreshFiles();
+} else {
+  // force login modal (required)
+  showLoginModal(true);
+  // ensure controls reflect logged-out state
+  updateUserUI();
+}
 
 </script>
 </body>
