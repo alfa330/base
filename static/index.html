@@ -48,9 +48,80 @@
 <script>
 const api = (path, opts) => fetch('/api' + path, opts);
 
+// WebSocket
+let ws;
+function initWS(){
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+  ws.onopen = () => {
+    console.log("WS connected");
+    // send occasional ping to keep alive
+    setInterval(()=> {
+      try { ws.send("ping"); } catch(e) {}
+    }, 20000);
+  };
+  ws.onmessage = (ev) => {
+    try {
+      // backend sometimes sends plain text ack; handle only JSON
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch(e) { /* not JSON */ return; }
+      handleWsMessage(msg);
+    } catch (e) { console.error("ws parse error", e); }
+  };
+  ws.onclose = () => {
+    console.log("WS closed — reconnect in 3s");
+    setTimeout(initWS, 3000);
+  };
+  ws.onerror = (e) => console.warn("WS error", e);
+}
+
+function handleWsMessage(msg){
+  // example msg: {"run_id":"...", "type":"saved", "index":1, "url":"...", "file":"00001_page_abc.json", "title":"...","content":"..."}
+  const t = msg.type || "event";
+  if (t === "saved") {
+    addFileToUI(msg);
+  } else if (t === "run_started") {
+    const el = document.getElementById('start_result');
+    el.innerText = `Run started: ${msg.run_id} ${msg.start_url || ""}`;
+  } else if (t === "finished") {
+    // optional handling
+    console.log("run finished", msg);
+  } else {
+    // generic push: show in logs
+    const pre = document.getElementById('log');
+    pre.innerText += JSON.stringify(msg, null, 2) + "\n";
+  }
+}
+
+// append file info to UI
+function addFileToUI(item){
+  const filesEl = document.getElementById('files');
+  const name = item.file || item.name || ("item_" + Date.now());
+  const div = document.createElement('div');
+  div.style.margin = '8px 0';
+  const kb = item.size ? Math.round(item.size/1024) + 'KB' : '';
+  let contentPreview = "";
+  if (item.content) {
+    contentPreview = `<pre style="max-height:180px;overflow:auto;margin-top:6px;">${escapeHtml(item.content)}</pre>`;
+  }
+  div.innerHTML = `<strong>${escapeHtml(name)}</strong> ${kb} — <a href="/api/output/${encodeURIComponent(name)}" target="_blank">Download</a>
+    <div>Source: <a href="${escapeHtml(item.url||'#')}" target="_blank">${escapeHtml(item.url||'')}</a></div>
+    ${contentPreview}
+  `;
+  filesEl.prepend(div);
+  // also update logs area
+  const pre = document.getElementById('log');
+  pre.innerText = `Saved: ${name}\n` + (pre.innerText || "");
+}
+
+function escapeHtml(s){
+  if (!s) return "";
+  return s.replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]); });
+}
+
+// wire start button (keeps previous behavior)
 document.getElementById('btnStart').onclick = async () => {
   const start_url = document.getElementById('start_url').value.trim();
-  if (!start_url) return alert('specify start url');
+  if (!start_url) return alert('Укажи start_url');
   const prefix = document.getElementById('prefix').value || null;
   const concurrency = parseInt(document.getElementById('concurrency').value || '5', 10);
   const save_html = document.getElementById('save_html').checked;
@@ -58,56 +129,10 @@ document.getElementById('btnStart').onclick = async () => {
   const res = await api('/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
   const data = await res.json();
   document.getElementById('start_result').innerText = JSON.stringify(data, null, 2);
-  refreshRuns();
 };
 
-async function refreshRuns(){
-  // we don't have central registry endpoint; list files and infer runs from logs
-  const res = await api('/list');
-  const data = await res.json();
-  const files = data.files || [];
-  const runsEl = document.getElementById('runs');
-  runsEl.innerHTML = '';
-  // show JSON files and try to detect run log files
-  const logs = files.filter(f=>f.name.endsWith('.json') || f.name.endsWith('.md'));
-  // show last 20
-  for (const f of files.slice(-20).reverse()){
-    const btn = document.createElement('div');
-    btn.innerHTML = `<div style="display:flex;justify-content:space-between;gap:8px;">
-      <div>${f.name}</div>
-      <div>
-        <a href="/api/output/${encodeURIComponent(f.name)}" target="_blank">Download</a>
-      </div>
-    </div>`;
-    document.getElementById('files').prepend(btn);
-  }
-  // also list run logs
-  const logRes = await fetch('/api/list');
-}
-
-document.getElementById('btnList').onclick = refreshRuns;
-
-// poll last logs (simple: pick the newest .log in output_async)
-async function fetchLatestLog(){
-  const res = await api('/list');
-  const data = await res.json();
-  const files = data.files || [];
-  // find .log files
-  const logs = files.filter(f => f.name.endsWith('.log'));
-  if (logs.length === 0) {
-    document.getElementById('log').innerText = 'No logs yet';
-    return;
-  }
-  const latest = logs[logs.length-1].name;
-  const logResp = await fetch('/api/logs/' + latest.replace('.log',''));
-  if (logResp.ok){
-    const text = await logResp.text();
-    document.getElementById('log').innerText = text.slice(-5000);
-  }
-}
-
-setInterval(fetchLatestLog, 3000);
-refreshRuns();
+// init
+initWS();
 </script>
 </body>
 </html>
