@@ -1,4 +1,4 @@
-<!-- static/index.html -->
+<!-- static/index.html (with login) -->
 <!doctype html>
 <html lang="ru">
 <head>
@@ -27,7 +27,7 @@
     .cols-3{grid-template-columns: 1.3fr 1fr 0.9fr}
     .cols-2{grid-template-columns: 1fr 1fr}
     label{font-size:13px;color:var(--muted)}
-    input[type="text"], input[type="number"], select { width:100%; padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:var(--text) }
+    input[type="text"], input[type="number"], input[type="password"], select { width:100%; padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:var(--text) }
     input[type="checkbox"]{transform:scale(1.1); margin-right:6px}
     button { background:linear-gradient(90deg,var(--accent),var(--accent-2)); border:none; color:white; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:600 }
     button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06); color:var(--text); font-weight:600}
@@ -50,8 +50,16 @@
     footer{margin-top:18px;color:var(--muted);font-size:13px;text-align:center}
     .toast{position:fixed;right:20px;bottom:20px;padding:10px 16px;border-radius:10px;background:#111827;color:white;box-shadow:0 6px 20px rgba(2,6,23,0.5)}
     .btn-danger{background:#ef4444}
+    /* login modal */
+    .modal-backdrop{position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:60}
+    .modal{width:360px;background:var(--card);padding:16px;border-radius:12px;box-shadow:0 10px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.04)}
+    .modal h3{margin:0 0 8px 0}
+    .modal .error{color:#f87171;margin-top:8px}
+    .modal .row{margin-top:10px}
+    .mini{font-size:12px;color:var(--muted)}
     @media (max-width:980px){
       .cols-3{grid-template-columns: 1fr}
+      .modal{width:92%}
     }
   </style>
 </head>
@@ -64,6 +72,11 @@
       </div>
       <div class="top-actions">
         <div class="small muted">Тек. соединение: <span id="ws_status">—</span></div>
+        <div id="userBlock" style="display:flex;align-items:center;gap:8px">
+          <div class="mini muted" id="userName">—</div>
+          <button id="btnLogin" class="ghost">Вход</button>
+          <button id="btnLogout" class="ghost" style="display:none">Выйти</button>
+        </div>
         <button id="btnRefresh" class="ghost" title="Обновить список файлов">Обновить</button>
         <button id="toggleTheme" class="ghost">Тёмная/Светлая</button>
       </div>
@@ -180,11 +193,37 @@
 
   <div id="toast" class="toast" style="display:none"></div>
 
+  <!-- Login modal (hidden by default) -->
+  <div id="loginModalWrap" style="display:none">
+    <div class="modal-backdrop" id="loginBackdrop">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+        <h3 id="loginTitle">Вход</h3>
+        <div class="mini muted">Войдите, чтобы получить дополнительные права и API-ключ</div>
+        <div style="margin-top:12px">
+          <label>Логин
+            <input id="loginInput" type="text" autocomplete="username" />
+          </label>
+          <label style="margin-top:10px">Пароль
+            <input id="passwordInput" type="password" autocomplete="current-password" />
+          </label>
+          <div class="error" id="loginError" style="display:none"></div>
+          <div class="row" style="margin-top:12px; justify-content:flex-end">
+            <button id="loginCancel" class="ghost">Отмена</button>
+            <button id="loginSubmit">Войти</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 <script>
 /* ========== CONFIG ========== */
-const API = '/api';
+const API = '/api'; // local crawler backend
+const API_BASE_URL = 'https://otp-2-fos4.onrender.com'; // external auth service (as provided)
 const WS_PATH = '/ws';
 const MAX_CONTENT_LEN = 20000; // keep synced with server-side
+
+/* ========== STATE ========== */
 let ws = null;
 let reconnectTimer = null;
 let activeRuns = {}; // run_id -> meta
@@ -193,6 +232,35 @@ let filesOrder = []; // filenames sorted
 let theme = localStorage.getItem('theme') || 'dark';
 if(theme === 'light') document.documentElement.classList.add('light'); else document.documentElement.classList.remove('light');
 document.getElementById('max_preview').innerText = MAX_CONTENT_LEN;
+
+/* User state (persisted) */
+let user = null;
+function loadUser(){
+  try{
+    const raw = localStorage.getItem('crawler_user');
+    if(raw) user = JSON.parse(raw);
+  }catch(e){ user = null; }
+  updateUserUI();
+}
+function saveUser(u){
+  user = u;
+  if(u) localStorage.setItem('crawler_user', JSON.stringify(u)); else localStorage.removeItem('crawler_user');
+  updateUserUI();
+}
+function updateUserUI(){
+  const userName = document.getElementById('userName');
+  const btnLogin = document.getElementById('btnLogin');
+  const btnLogout = document.getElementById('btnLogout');
+  if(user && user.name){
+    userName.innerText = user.name + (user.role ? ` (${user.role})` : '');
+    btnLogin.style.display = 'none';
+    btnLogout.style.display = 'inline-flex';
+  } else {
+    userName.innerText = '—';
+    btnLogin.style.display = 'inline-flex';
+    btnLogout.style.display = 'none';
+  }
+}
 
 /* ========== HELPERS ========== */
 function toast(text, ms=3000){
@@ -221,7 +289,6 @@ function initWS(){
   updateWsStatus('connecting');
   ws.onopen = () => { updateWsStatus('connected'); toast('WS connected'); pingLoop(); };
   ws.onmessage = (ev) => {
-    // backend might send raw 'ack' text; try parse json
     let msg = null;
     try { msg = JSON.parse(ev.data); } catch(e){ return; }
     handleWsMessage(msg);
@@ -244,10 +311,8 @@ function pingLoop(){
 
 /* ========== WS message handling ========== */
 function handleWsMessage(msg){
-  // normalize
   const type = msg.type || msg.event || 'event';
   if(type === 'saved'){
-    // server should send: { run_id, type:'saved', file, url, title, content }
     addOrUpdateFile(msg);
     logEvent({event:'saved', file: msg.file, run: msg.run_id});
   } else if(type === 'run_started' || type === 'started'){
@@ -261,7 +326,6 @@ function handleWsMessage(msg){
     if(activeRuns[msg.run_id]) activeRuns[msg.run_id].finished = true;
     renderRuns();
   } else {
-    // generic
     logEvent(msg);
   }
 }
@@ -279,22 +343,18 @@ function addOrUpdateFile(item){
     run_id: item.run_id || '',
     ts: now
   };
-  // replace or add
   filesIndex.set(name, entry);
-  // update order: newest first
   filesOrder = Array.from(filesIndex.keys()).sort((a,b)=>{
     return filesIndex.get(b).ts - filesIndex.get(a).ts;
   });
   renderFiles();
 }
 
-/* fetch list from server (initial sync / refresh) */
 async function refreshFiles(){
   try{
-    const res = await fetch(`${API}/list`);
+    const res = await fetch(`${API}/list`, { headers: defaultHeaders() });
     if(!res.ok) throw new Error('list failed');
     const data = await res.json();
-    // data.files is array of {name,size,path}
     (data.files || []).forEach(f=>{
       if(!filesIndex.has(f.name)){
         filesIndex.set(f.name, { name: f.name, title:'', url:'', content:'', size: f.size || 0, ts: Date.now() });
@@ -360,16 +420,26 @@ function renderRuns(){
   });
 }
 
-/* ========== API actions ========== */
+/* ========== API helpers and actions ========== */
+function defaultHeaders(){
+  const headers = { 'Accept': 'application/json' };
+  if(user && user.apiKey){
+    headers['x-api-key'] = user.apiKey;
+    // some APIs use Authorization: Bearer <key> — change if needed
+    // headers['Authorization'] = `Bearer ${user.apiKey}`;
+  }
+  return headers;
+}
+
 async function startCrawl(bg=false){
   const start_url = document.getElementById('start_url').value.trim();
   if(!start_url) return alert('Укажи start_url');
   const prefix = document.getElementById('prefix').value || null;
   const concurrency = parseInt(document.getElementById('concurrency').value||'5',10);
   const save_html = document.getElementById('save_html').checked;
-  const body = { start_url, prefix, concurrency, save_html };
+  const body = { start_url, prefix, concurrency, save_html, bg };
   try{
-    const res = await fetch(`${API}/start`, { method:'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const res = await fetch(`${API}/start`, { method:'POST', headers: Object.assign({'Content-Type':'application/json'}, defaultHeaders()), body: JSON.stringify(body) });
     const data = await res.json();
     document.getElementById('start_result').innerText = JSON.stringify(data, null, 2);
     if(data.run_id){
@@ -384,7 +454,7 @@ async function startCrawl(bg=false){
 async function stopRun(run_id){
   if(!confirm('Остановить run ' + run_id + '?')) return;
   try{
-    const res = await fetch(`${API}/stop/${encodeURIComponent(run_id)}`, { method:'POST' });
+    const res = await fetch(`${API}/stop/${encodeURIComponent(run_id)}`, { method:'POST', headers: defaultHeaders() });
     if(res.ok){
       toast('Stopping ' + run_id);
       delete activeRuns[run_id];
@@ -399,11 +469,9 @@ async function stopAll(){
 }
 
 async function fetchLogForFile(fname){
-  // try find run_id prefix in filename (not guaranteed). Otherwise show recent logs.
   toast('Fetching log...');
   try{
-    // list available log files and try show the newest
-    const res = await fetch(`${API}/list`);
+    const res = await fetch(`${API}/list`, { headers: defaultHeaders() });
     const data = await res.json();
     const logs = (data.files || []).filter(f => f.name.endsWith('.log'));
     if(logs.length === 0){ toast('No logs found'); return; }
@@ -418,6 +486,80 @@ function downloadRunLog(run_id){
   window.open(url, '_blank');
 }
 
+/* ========== Login logic (adapted from provided code) ========== */
+function showLoginModal(open = true){
+  document.getElementById('loginModalWrap').style.display = open ? 'block' : 'none';
+  if(open){
+    document.getElementById('loginInput').focus();
+  } else {
+    document.getElementById('loginError').style.display = 'none';
+    document.getElementById('loginInput').value = '';
+    document.getElementById('passwordInput').value = '';
+  }
+}
+
+async function handleLogin(){
+  const login = document.getElementById('loginInput').value || '';
+  const password = document.getElementById('passwordInput').value || '';
+  const errEl = document.getElementById('loginError');
+  if(!login.trim() || !password.trim()){
+    errEl.innerText = 'Пожалуйста, введите логин и пароль';
+    errEl.style.display = 'block';
+    setTimeout(()=> { errEl.style.display = 'none'; }, 5000);
+    return;
+  }
+  const submitBtn = document.getElementById('loginSubmit');
+  submitBtn.disabled = true;
+  submitBtn.innerText = 'Вхожу...';
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login: login.trim(), password: password.trim() })
+    });
+    if(!response.ok){
+      const text = await response.text().catch(()=>null);
+      throw { network: true, status: response.status, text };
+    }
+    const data = await response.json();
+    if (data.status === 'success') {
+      // expected fields: role, id, name, telegram_id, apiKey
+      const newUser = {
+        role: data.role || null,
+        id: data.id || null,
+        name: data.name || login.trim(),
+        telegram_id: data.telegram_id || null,
+        apiKey: data.apiKey || data.api_key || null
+      };
+      saveUser(newUser);
+      showLoginModal(false);
+      toast('Logged in successfully', 3000);
+      // clear fields
+      document.getElementById('loginInput').value = '';
+      document.getElementById('passwordInput').value = '';
+    } else {
+      errEl.innerText = 'Неправильный логин или пароль';
+      errEl.style.display = 'block';
+      setTimeout(()=> { errEl.style.display = 'none'; }, 5000);
+    }
+  } catch (err) {
+    console.error('Login error:', err);
+    const errElText = (err && err.text) ? (err.text || 'Ошибка сети') : (err?.message || 'Ошибка сети');
+    document.getElementById('loginError').innerText = errElText;
+    document.getElementById('loginError').style.display = 'block';
+    setTimeout(()=> { document.getElementById('loginError').style.display = 'none'; }, 5000);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerText = 'Войти';
+  }
+}
+
+function handleLogout(){
+  if(!confirm('Выйти?')) return;
+  saveUser(null);
+  toast('Logged out', 1500);
+}
+
 /* ========== UI wiring ========== */
 document.getElementById('btnStart').onclick = ()=> startCrawl(false);
 document.getElementById('btnStartBG').onclick = ()=> startCrawl(true);
@@ -429,7 +571,7 @@ document.getElementById('sort').onchange = ()=> renderFiles();
 document.getElementById('btnClearLog').onclick = ()=> { document.getElementById('log').innerText=''; };
 document.getElementById('btnDownloadLog').onclick = async ()=> {
   try{
-    const res = await fetch(`${API}/list`);
+    const res = await fetch(`${API}/list`, { headers: defaultHeaders() });
     const data = await res.json();
     const logs = (data.files||[]).filter(f=>f.name.endsWith('.log'));
     if(logs.length===0){ toast('No logs'); return; }
@@ -444,11 +586,21 @@ document.getElementById('toggleTheme').onclick = ()=> {
   if(document.documentElement.classList.contains('light')){ document.documentElement.classList.remove('light'); localStorage.setItem('theme','dark'); } else { document.documentElement.classList.add('light'); localStorage.setItem('theme','light'); }
 };
 
+/* Login buttons */
+document.getElementById('btnLogin').onclick = ()=> showLoginModal(true);
+document.getElementById('loginCancel').onclick = ()=> showLoginModal(false);
+document.getElementById('loginSubmit').onclick = ()=> handleLogin();
+document.getElementById('btnLogout').onclick = ()=> handleLogout();
+
+/* close modal on backdrop click */
+document.getElementById('loginBackdrop').onclick = (e)=> {
+  if(e.target === document.getElementById('loginBackdrop')) showLoginModal(false);
+};
+
 /* ========== Init ========= */
+loadUser();
 initWS();
 refreshFiles();
-
-/* reconnect safety: if ws doesn't connect in 3s, try again */
 setTimeout(()=>{ if(!ws || ws.readyState !== WebSocket.OPEN) initWS(); }, 3000);
 
 </script>

@@ -100,6 +100,8 @@ class AsyncCrawler:
         user_agent: Optional[str] = None,
         status_callback=None,  # callable(status_dict) called on updates
     ):
+        # initialize logger early so _init_robots can use it
+        self.logger = logging.getLogger("crawler")
         self.start_url = start_url
         self.base_url = base_url or start_url
         parsed = urlparse(self.base_url)
@@ -120,10 +122,10 @@ class AsyncCrawler:
         self.index = 0
         self.pbar = None
         self.rp = robotparser.RobotFileParser()
-        self._init_robots()
-        self._stop_event = asyncio.Event()
         self.status_callback = status_callback
-        self.logger = logging.getLogger("crawler")
+        self._stop_event = asyncio.Event()
+        # initialize robots after logger exists
+        self._init_robots()
 
     def _init_robots(self):
         robots_url = urljoin(self.base_netloc, "/robots.txt")
@@ -132,6 +134,7 @@ class AsyncCrawler:
             self.rp.read()
             self.logger.info("Loaded robots.txt from %s", robots_url)
         except Exception as e:
+            # use logger (initialized in __init__)
             self.logger.warning("Could not read robots.txt (%s)", e)
 
     def allowed_by_robots(self, url: str) -> bool:
