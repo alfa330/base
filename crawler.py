@@ -11,7 +11,6 @@ from slugify import slugify
 from tqdm import tqdm
 import logging
 import time
-import os
 import json
 import hashlib
 from pathlib import Path
@@ -134,7 +133,6 @@ class AsyncCrawler:
             self.rp.read()
             self.logger.info("Loaded robots.txt from %s", robots_url)
         except Exception as e:
-            # use logger (initialized in __init__)
             self.logger.warning("Could not read robots.txt (%s)", e)
 
     def allowed_by_robots(self, url: str) -> bool:
@@ -203,6 +201,27 @@ class AsyncCrawler:
                 urls.add(full)
         return urls
 
+    def _branch_path_for_url(self, url: str) -> Path:
+        """
+        Determine directory path under output_dir for a given URL.
+        Strategy: OUTPUT_DIR / netloc / first_segment / second_segment  (up to 2 segments)
+        If no path segments -> OUTPUT_DIR / netloc / root
+        """
+        p = urlparse(url)
+        netloc = p.netloc or "unknown"
+        segs = [s for s in (p.path or "").split("/") if s]
+        # take up to first 2 segments
+        first = segs[0] if len(segs) >= 1 else None
+        second = segs[1] if len(segs) >= 2 else None
+        parts = [netloc]
+        if first:
+            parts.append(slugify(first) or first)
+        if second:
+            parts.append(slugify(second) or second)
+        branch_path = self.output_dir.joinpath(*parts)
+        branch_path.mkdir(parents=True, exist_ok=True)
+        return branch_path
+
     async def parse_and_save(self, url: str, html: str):
         soup = BeautifulSoup(html, "html.parser")
         title, content = extract_text(soup)
@@ -222,8 +241,11 @@ class AsyncCrawler:
 
         self.index += 1
         fname = make_safe_filename(self.index, url, title)
-        out_path = self.output_dir / fname
-        # write json and md asynchronously
+
+        # determine branch directory and save file there
+        branch_dir = self._branch_path_for_url(url)
+        out_path = branch_dir / fname
+
         try:
             async with aiofiles.open(out_path, mode="w", encoding="utf-8") as f:
                 await f.write(json.dumps(data, ensure_ascii=False, indent=2))
@@ -231,7 +253,7 @@ class AsyncCrawler:
             self.logger.exception("Failed to write JSON file %s", out_path)
 
         md_name = fname.replace(".json", ".md")
-        md_path = self.output_dir / md_name
+        md_path = branch_dir / md_name
         try:
             async with aiofiles.open(md_path, mode="w", encoding="utf-8") as f:
                 await f.write(f"# {data.get('title','')}\n\n")
@@ -240,7 +262,7 @@ class AsyncCrawler:
         except Exception:
             self.logger.exception("Failed to write MD file %s", md_path)
 
-        self.logger.info("Saved [%d] %s -> %s", self.index, url, out_path.name)
+        self.logger.info("Saved [%d] %s -> %s", self.index, url, str(out_path.relative_to(self.output_dir)))
         if self.pbar:
             self.pbar.update(1)
 
@@ -248,16 +270,18 @@ class AsyncCrawler:
         if self.status_callback:
             try:
                 MAX_CONTENT_LEN = 20_000
+                # branch relative path
+                branch_rel = str(out_path.parent.relative_to(self.output_dir))
                 payload = {
                     "type": "saved",
                     "index": self.index,
-                    "file": out_path.name,
+                    "file": str(Path(branch_rel) / fname),
                     "url": url,
                     "title": title,
                     "content": (content or "")[:MAX_CONTENT_LEN],
+                    "branch": branch_rel
                 }
                 self.logger.debug("Calling status_callback for %s -> %s", url, out_path.name)
-                # status_callback is synchronous by contract here (will schedule async broadcast)
                 self.status_callback(payload)
             except Exception:
                 self.logger.exception("status_callback failed after saving file")
@@ -313,7 +337,6 @@ class AsyncCrawler:
             workers_count = max(2, self.concurrent * 2)
             tasks = [asyncio.create_task(self.worker(session)) for _ in range(workers_count)]
             if self.status_callback:
-                # send started event
                 try:
                     self.status_callback({"type": "started", "start_url": self.start_url})
                 except Exception:

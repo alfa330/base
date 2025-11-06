@@ -1,15 +1,19 @@
 # main.py
 import asyncio
 import logging
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, HttpUrl
-from pathlib import Path
-import uvicorn
 import os
 import json
+import shutil
+import tempfile
+from pathlib import Path
 from typing import Optional, List, Dict, Any
+
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, HttpUrl
+import uvicorn
+
 from crawler import AsyncCrawler, setup_logging
 
 # Setup logging early
@@ -30,9 +34,24 @@ if not static_dir.exists():
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
+# HEAD on root for uptime checks — return 200 without body
+@app.head("/")
+async def head_root() -> Response:
+    return Response(status_code=200)
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
     return (static_dir / "index.html").read_text(encoding="utf-8")
+
+
+# Simple health endpoints for uptime monitors
+@app.head("/health")
+async def head_health() -> Response:
+    return Response(status_code=200)
+
+@app.get("/health")
+async def get_health():
+    return JSONResponse({"status": "ok", "uptime_check": True})
 
 
 # --- WebSocket manager (simple broadcast) ---
@@ -76,24 +95,23 @@ class WebSocketManager:
 ws_manager = WebSocketManager()
 
 
-# WS endpoint: accept connections and keep alive; respond to simple text pings from client
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    """
+    Keep connection open. Client may send 'ping' text; we reply 'ack'.
+    """
     await ws_manager.connect(websocket)
     try:
         while True:
             try:
                 msg = await websocket.receive_text()
-                # reply ack for pings; ignore other messages
                 try:
                     await websocket.send_text("ack")
                 except Exception:
-                    # ignore send failures here; client might be dead
                     pass
             except WebSocketDisconnect:
                 break
             except Exception:
-                # ignore transient errors, keep connection alive
                 await asyncio.sleep(0.1)
                 continue
     finally:
@@ -136,11 +154,9 @@ def status_logger_factory(run_id: str):
             payload = {"run_id": run_id, **status}
             # schedule broadcast on running loop
             try:
-                # if no running loop, asyncio.get_running_loop() will raise
                 asyncio.get_running_loop()
                 asyncio.create_task(ws_manager.broadcast_json(payload))
             except RuntimeError:
-                # fallback: try to use call_soon_threadsafe on default loop
                 try:
                     loop = asyncio.get_event_loop()
                     loop.call_soon_threadsafe(asyncio.create_task, ws_manager.broadcast_json(payload))
@@ -189,6 +205,20 @@ async def stop_crawl(run_id: str):
     return {"run_id": run_id, "status": "stopping"}
 
 
+@app.post("/api/stop_all")
+async def stop_all_runs():
+    stopped = []
+    for run_id, entry in list(RUNS.items()):
+        try:
+            entry["crawler"].stop()
+            stopped.append(run_id)
+        except Exception as e:
+            logger.exception("Error stopping run %s: %s", run_id, e)
+    await ws_manager.broadcast_json({"type": "stopped_all", "runs": stopped})
+    logger.info("stop_all called, stopped %d runs", len(stopped))
+    return {"stopped": stopped}
+
+
 @app.get("/api/status/{run_id}")
 async def get_status(run_id: str):
     entry = RUNS.get(run_id)
@@ -217,18 +247,91 @@ async def get_status(run_id: str):
 
 @app.get("/api/list")
 async def list_outputs():
+    """Backward-compatible file list (all files under OUTPUT_DIR, flattened)."""
     files = []
-    for p in sorted(OUTPUT_DIR.glob("*")):
-        files.append({"name": p.name, "size": p.stat().st_size, "path": str(p)})
+    for p in sorted(OUTPUT_DIR.rglob("*")):
+        if p.is_file():
+            rel = p.relative_to(OUTPUT_DIR)
+            files.append({"name": str(rel), "size": p.stat().st_size, "path": str(p)})
     return {"files": files}
 
 
-@app.get("/api/output/{name}")
+@app.get("/api/dirs")
+async def list_dirs():
+    """List branches (top-level netloc folders and nested) with counts and sizes."""
+    dirs = []
+    base = OUTPUT_DIR
+    if not base.exists():
+        return {"dirs": []}
+    for p in sorted(base.rglob("*")):
+        if p.is_dir():
+            # only include directories that contain files
+            files = list(p.glob("**/*"))
+            files = [f for f in files if f.is_file()]
+            if not files:
+                continue
+            total = sum(f.stat().st_size for f in files)
+            rel = str(p.relative_to(base))
+            dirs.append({"branch": rel, "files": len(files), "size": total})
+    # Deduplicate by branch (keep unique)
+    uniq = {}
+    for d in dirs:
+        uniq[d["branch"]] = d
+    return {"dirs": list(uniq.values())}
+
+
+@app.get("/api/dir/{dir_path:path}/files")
+async def list_files_in_dir(dir_path: str):
+    target = (OUTPUT_DIR / dir_path).resolve()
+    if not str(target).startswith(str(OUTPUT_DIR.resolve())):
+        raise HTTPException(status_code=400, detail="Invalid path")
+    if not target.exists() or not target.is_dir():
+        raise HTTPException(status_code=404, detail="Directory not found")
+    files = []
+    for p in sorted(target.glob("**/*")):
+        if p.is_file():
+            rel = p.relative_to(OUTPUT_DIR)
+            files.append({"name": str(rel), "size": p.stat().st_size, "path": str(p)})
+    return {"files": files}
+
+
+@app.get("/api/download_dir/{dir_path:path}")
+async def download_dir(dir_path: str):
+    target = (OUTPUT_DIR / dir_path).resolve()
+    if not str(target).startswith(str(OUTPUT_DIR.resolve())):
+        raise HTTPException(status_code=400, detail="Invalid path")
+    if not target.exists() or not target.is_dir():
+        raise HTTPException(status_code=404, detail="Directory not found")
+
+    # create temporary directory to hold archive
+    tmpdir = tempfile.mkdtemp(prefix="crawler-zip-")
+    base_name = os.path.join(tmpdir, "archive")
+    archive_path = shutil.make_archive(base_name, 'zip', root_dir=str(target))
+    # schedule cleanup in 60s
+    def _cleanup(pathp, d):
+        try:
+            if os.path.exists(pathp):
+                os.remove(pathp)
+            if os.path.isdir(d):
+                shutil.rmtree(d, ignore_errors=True)
+        except Exception:
+            logger.exception("Failed cleaning up temp zip %s", pathp)
+    loop = asyncio.get_event_loop()
+    loop.call_later(60, _cleanup, archive_path, tmpdir)
+
+    filename = f"{Path(dir_path).name or 'branch'}.zip"
+    return FileResponse(archive_path, media_type="application/zip", filename=filename)
+
+
+@app.get("/api/output/{name:path}")
 async def get_output_file(name: str):
-    p = OUTPUT_DIR / name
+    # `name` is a relative path inside OUTPUT_DIR
+    p = (OUTPUT_DIR / name).resolve()
+    if not str(p).startswith(str(OUTPUT_DIR.resolve())):
+        raise HTTPException(status_code=400, detail="Invalid path")
     if not p.exists():
         raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(p, media_type="application/octet-stream", filename=name)
+    return FileResponse(p, media_type="application/octet-stream", filename=p.name)
 
 
 @app.get("/api/logs/{run_id}")

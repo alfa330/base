@@ -1,5 +1,5 @@
-<!-- static/index.html (login required) -->
 <!doctype html>
+
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
@@ -35,22 +35,25 @@
     .row{display:flex;gap:10px;align-items:center}
     .small{font-size:13px;color:var(--muted)}
     .muted{color:var(--muted)}
-    #files{max-height:56vh; overflow:auto; display:flex; flex-direction:column; gap:8px; padding-top:8px}
+    #files{max-height:46vh; overflow:auto; display:flex; flex-direction:column; gap:8px; padding-top:8px}
     .file-item{display:flex; gap:12px; align-items:flex-start; padding:10px; border-radius:10px; background:var(--glass); border:1px solid rgba(255,255,255,0.02)}
     .file-meta{flex:1}
     .file-actions{display:flex;gap:8px;align-items:center}
     .fname{font-weight:700}
     .ftitle{color:var(--muted); font-size:13px; margin-top:4px}
     pre.preview{background:rgba(0,0,0,0.12); padding:8px; border-radius:8px; max-height:160px; overflow:auto; margin-top:8px; white-space:pre-wrap}
-    .runs-list{display:flex;flex-direction:column; gap:8px; max-height:40vh; overflow:auto}
+    .runs-list{display:flex;flex-direction:column; gap:8px; max-height:24vh; overflow:auto}
     .run-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:8px;background:var(--glass)}
-    .log-area{height:180px; overflow:auto; background:rgba(0,0,0,0.06); padding:10px; border-radius:8px; font-family:monospace; font-size:12px; color:var(--muted)}
+    .log-area{height:150px; overflow:auto; background:rgba(0,0,0,0.06); padding:10px; border-radius:8px; font-family:monospace; font-size:12px; color:var(--muted)}
     .controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
     .search{display:flex; gap:8px; align-items:center; margin-bottom:8px}
     .tag{display:inline-block;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.02);font-size:12px;color:var(--muted)}
     footer{margin-top:18px;color:var(--muted);font-size:13px;text-align:center}
     .toast{position:fixed;right:20px;bottom:20px;padding:10px 16px;border-radius:10px;background:#111827;color:white;box-shadow:0 6px 20px rgba(2,6,23,0.5);z-index:80}
     .btn-danger{background:#ef4444}
+    .dir-list{display:flex;flex-direction:column;gap:8px;max-height:18vh;overflow:auto;margin-top:8px}
+    .dir-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)}
+    .dir-meta{font-size:13px;color:var(--muted)}
     /* login modal */
     .modal-backdrop{position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:100}
     .modal{width:360px;background:var(--card);padding:16px;border-radius:12px;box-shadow:0 10px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.04)}
@@ -83,118 +86,136 @@
       </div>
     </header>
 
-    <main class="grid cols-3" style="align-items:start">
-      <!-- Left: Start form + Outputs -->
-      <section>
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div>
-              <div style="font-weight:700">Start new crawl</div>
-              <div class="small muted">Укажи стартовый URL и опции</div>
-            </div>
-            <div class="tag" id="last_run_info">—</div>
-          </div>
+```
+<main class="grid cols-3" style="align-items:start">
+  <!-- Left: Start form + Outputs -->
+  <section>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div>
+          <div style="font-weight:700">Start new crawl</div>
+          <div class="small muted">Укажи стартовый URL и опции</div>
+        </div>
+        <div class="tag" id="last_run_info">—</div>
+      </div>
 
-          <div style="display:grid;gap:8px">
-            <label>Start URL
-              <input id="start_url" type="text" placeholder="https://example.com/path" />
-            </label>
+      <div style="display:grid;gap:8px">
+        <label>Start URL
+          <input id="start_url" type="text" placeholder="https://example.com/path" />
+        </label>
 
-            <div style="display:flex;gap:8px">
-              <label style="flex:1">Prefix (optional)
-                <input id="prefix" type="text" placeholder="/docs/path" />
-              </label>
-              <label style="width:120px">Concurrency
-                <input id="concurrency" type="number" value="5" min="1" />
-              </label>
-            </div>
-
-            <div class="row">
-              <label><input id="save_html" type="checkbox" /> Save raw HTML</label>
-              <label class="small muted" style="margin-left:auto">Max preview: <span id="max_preview">20000</span> chars</label>
-            </div>
-
-            <div class="controls" style="margin-top:6px">
-              <button id="btnStart" disabled>Start</button>
-              <button id="btnStartBG" class="ghost" title="Start in background" disabled>Start (bg)</button>
-              <button id="btnList" class="ghost" disabled>List outputs</button>
-            </div>
-
-            <pre id="start_result" class="log-area" style="margin-top:10px"></pre>
-          </div>
+        <div style="display:flex;gap:8px">
+          <label style="flex:1">Prefix (optional)
+            <input id="prefix" type="text" placeholder="/docs/path" />
+          </label>
+          <label style="width:120px">Concurrency
+            <input id="concurrency" type="number" value="5" min="1" />
+          </label>
         </div>
 
-        <div style="height:16px"></div>
-
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div style="font-weight:700">Outputs</div>
-            <div class="small muted">Файлы появляются автоматически</div>
-          </div>
-
-          <div class="search">
-            <input id="q" type="text" placeholder="Поиск по имени или URL" />
-            <select id="sort">
-              <option value="new">Сначала новые</option>
-              <option value="old">Сначала старые</option>
-            </select>
-            <button id="clearSearch" class="ghost">Очистить</button>
-          </div>
-
-          <div id="files" aria-live="polite"></div>
-        </div>
-      </section>
-
-      <!-- Middle: Runs and Logs -->
-      <aside>
-        <div class="card" style="margin-bottom:12px">
-          <div style="font-weight:700;margin-bottom:8px">Active runs</div>
-          <div class="runs-list" id="runs"></div>
+        <div class="row">
+          <label><input id="save_html" type="checkbox" /> Save raw HTML</label>
+          <label class="small muted" style="margin-left:auto">Max preview: <span id="max_preview">20000</span> chars</label>
         </div>
 
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div style="font-weight:700">Event log</div>
-            <div class="small muted">Последние события</div>
-          </div>
-          <div id="log" class="log-area"></div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button id="btnClearLog" class="ghost">Очистить</button>
-            <button id="btnDownloadLog" class="ghost" disabled>Скачать лог (последний)</button>
-          </div>
-        </div>
-      </aside>
-
-      <!-- Right: Quick actions & help -->
-      <section>
-        <div class="card" style="margin-bottom:12px">
-          <div style="font-weight:700">Quick actions</div>
-          <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-            <button id="btnShowFiles" class="ghost" disabled>Показать все файлы</button>
-            <button id="btnClearOutputs" class="ghost">Очистить список (локально)</button>
-            <button id="btnStopAll" class="btn-danger" disabled>Stop all runs</button>
-          </div>
+        <div class="controls" style="margin-top:6px">
+          <button id="btnStart" disabled>Start</button>
+          <button id="btnStartBG" class="ghost" title="Start in background" disabled>Start (bg)</button>
+          <button id="btnList" class="ghost" disabled>List outputs</button>
         </div>
 
-        <div class="card">
-          <div style="font-weight:700">Help</div>
-          <div class="small muted" style="margin-top:8px">
-            • Запуск стартует краулер на сервере. <br>
-            • Каждая сохранённая страница пушится на фронт через WebSocket и отображается в Outputs. <br>
-            • Клик по «Download» скачает JSON файл с сервера.
-          </div>
-        </div>
-      </section>
-    </main>
+        <pre id="start_result" class="log-area" style="margin-top:10px"></pre>
+      </div>
+    </div>
 
-    <footer>
-      Crawler UI — простой интерфейс. Разворачивай, тестируй, улучшай.
-    </footer>
+    <div style="height:16px"></div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-weight:700">Outputs</div>
+        <div class="small muted">Файлы появляются автоматически</div>
+      </div>
+
+      <div class="search">
+        <input id="q" type="text" placeholder="Поиск по имени или URL" />
+        <select id="sort">
+          <option value="new">Сначала новые</option>
+          <option value="old">Сначала старые</option>
+        </select>
+        <button id="clearSearch" class="ghost">Очистить</button>
+      </div>
+
+      <div id="files" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- Middle: Runs and Logs -->
+  <aside>
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-weight:700;margin-bottom:8px">Active runs</div>
+      <div class="runs-list" id="runs"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-weight:700">Event log</div>
+        <div class="small muted">Последние события</div>
+      </div>
+      <div id="log" class="log-area"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="btnClearLog" class="ghost">Очистить</button>
+        <button id="btnDownloadLog" class="ghost" disabled>Скачать лог (последний)</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right: Directories, Quick actions & help -->
+  <section>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-weight:700">Branches (директории)</div>
+        <div class="small muted">Группировка файлов</div>
+      </div>
+
+      <div id="dirs" class="dir-list"><div class="small muted">Загрузка...</div></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="btnRefreshDirs" class="ghost">Обновить ветки</button>
+        <button id="btnDownloadSelected" class="ghost" disabled>Download selected</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-weight:700">Quick actions</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+        <button id="btnShowFiles" class="ghost" disabled>Показать все файлы</button>
+        <button id="btnClearOutputs" class="ghost">Очистить список (локально)</button>
+        <button id="btnStopAll" class="btn-danger" disabled>Stop all runs</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div style="font-weight:700">Help</div>
+      <div class="small muted" style="margin-top:8px">
+        • Запуск стартует краулер на сервере. <br>
+        • Каждая сохранённая страница пушится на фронт через WebSocket и отображается в Outputs. <br>
+        • Файлы группируются по веткам (branch). Нажми «Download» рядом с веткой, чтобы скачать zip. <br>
+        • Для управления требуется логин (API key).
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Crawler UI — простой интерфейс. Разворачивай, тестируй, улучшай.
+</footer>
+```
+
   </div>
 
   <div id="toast" class="toast" style="display:none"></div>
 
   <!-- Login modal (shown automatically, required) -->
+
   <div id="loginModalWrap" style="display:none">
     <div class="modal-backdrop" id="loginBackdrop" aria-hidden="false">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
@@ -219,7 +240,7 @@
 
 <script>
 /* ========== CONFIG ========== */
-const API = '/api'; // local crawler backend (requires x-api-key)
+const API = '/api'; // local crawler backend
 const API_BASE_URL = 'https://otp-2-fos4.onrender.com'; // external auth service (provided)
 const WS_PATH = '/ws';
 const MAX_CONTENT_LEN = 20000;
@@ -229,13 +250,15 @@ let ws = null;
 let reconnectTimer = null;
 let pingInterval = null;
 let activeRuns = {}; // run_id -> meta
-let filesIndex = new Map();
+let filesIndex = new Map(); // key: relative path (branch/file)
 let filesOrder = [];
 let theme = localStorage.getItem('theme') || 'dark';
 if(theme === 'light') document.documentElement.classList.add('light'); else document.documentElement.classList.remove('light');
 document.getElementById('max_preview').innerText = MAX_CONTENT_LEN;
 
 let user = null; // {role,id,name,telegram_id,apiKey}
+let dirs = []; // branches list
+let selectedBranch = null;
 
 /* ========== USER STORAGE & UI ========== */
 function loadUser(){
@@ -274,6 +297,7 @@ function updateUserUI(){
     showFilesBtn.disabled = false;
     stopAllBtn.disabled = false;
     downloadLogBtn.disabled = false;
+    document.getElementById('btnDownloadSelected').disabled = !selectedBranch;
   } else {
     userName.innerText = '—';
     btnLogin.style.display = 'inline-flex';
@@ -286,6 +310,7 @@ function updateUserUI(){
     showFilesBtn.disabled = true;
     stopAllBtn.disabled = true;
     downloadLogBtn.disabled = true;
+    document.getElementById('btnDownloadSelected').disabled = true;
   }
 }
 
@@ -345,8 +370,10 @@ function stopWS(){ try{ if(pingInterval) clearInterval(pingInterval); pingInterv
 function handleWsMessage(msg){
   const type = msg.type || msg.event || 'event';
   if(type === 'saved'){
+    // server now sends branch field; ensure file key uses branch prefix
+    // msg.file may be 'branch/fname.json' or just fname depending on server; keep it as-is
     addOrUpdateFile(msg);
-    logEvent({event:'saved', file: msg.file, run: msg.run_id});
+    logEvent({event:'saved', file: msg.file, run: msg.run_id, branch: msg.branch});
   } else if(type === 'run_started' || type === 'started'){
     activeRuns[msg.run_id] = { start_url: msg.start_url || msg.start_url, ts: Date.now() };
     renderRuns();
@@ -356,6 +383,10 @@ function handleWsMessage(msg){
   } else if(type === 'finished'){
     logEvent({event:'finished', run: msg.run_id});
     if(activeRuns[msg.run_id]) activeRuns[msg.run_id].finished = true;
+    renderRuns();
+  } else if(type === 'stopped_all'){
+    logEvent({event:'stopped_all', runs: msg.runs || []});
+    activeRuns = {};
     renderRuns();
   } else {
     logEvent(msg);
@@ -372,6 +403,7 @@ function addOrUpdateFile(item){
     url: item.url || '',
     title: item.title || '',
     content: item.content || '',
+    branch: item.branch || (name.includes('/') ? name.split('/').slice(0,-1).join('/') : ''),
     run_id: item.run_id || '',
     ts: now
   };
@@ -388,7 +420,7 @@ async function refreshFiles(){
     const data = await res.json();
     (data.files || []).forEach(f=>{
       if(!filesIndex.has(f.name)){
-        filesIndex.set(f.name, { name: f.name, title:'', url:'', content:'', size: f.size || 0, ts: Date.now() });
+        filesIndex.set(f.name, { name: f.name, title:'', url:'', content:'', size: f.size || 0, ts: Date.now(), branch: f.name.includes('/') ? f.name.split('/').slice(0,-1).join('/') : '' });
       }
     });
     filesOrder = Array.from(filesIndex.keys()).sort((a,b)=> filesIndex.get(b).ts - filesIndex.get(a).ts);
@@ -415,7 +447,8 @@ function renderFiles(){
     const actions = document.createElement('div'); actions.className = 'file-actions';
     meta.innerHTML = `<div class="fname">${escapeHtml(it.name)}</div>
                       <div class="ftitle">${escapeHtml(it.title || '')}</div>
-                      <div class="small muted">Source: <a href="${escapeHtml(it.url||'#')}" target="_blank">${escapeHtml(it.url||'')}</a></div>`;
+                      <div class="small muted">Source: <a href="${escapeHtml(it.url||'#')}" target="_blank">${escapeHtml(it.url||'')}</a></div>
+                      <div class="small muted">Branch: ${escapeHtml(it.branch || '')}</div>`;
     if(it.content){
       const pre = document.createElement('pre');
       pre.className = 'preview';
@@ -431,6 +464,50 @@ function renderFiles(){
     div.appendChild(meta); div.appendChild(actions);
     container.appendChild(div);
   }
+}
+
+/* ========== Directories (branches) UI ========== */
+async function loadDirs(){
+  if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
+  try{
+    const res = await fetch(`${API}/dirs`, { headers: defaultHeaders() });
+    if(!res.ok) throw new Error('dirs failed');
+    const data = await res.json();
+    dirs = data.dirs || [];
+    renderDirs();
+  }catch(e){
+    console.warn('loadDirs', e);
+    document.getElementById('dirs').innerHTML = '<div class="small muted">Ошибка загрузки веток</div>';
+  }
+}
+
+function renderDirs(){
+  const el = document.getElementById('dirs');
+  el.innerHTML = '';
+  if(!dirs || dirs.length === 0){
+    el.innerHTML = '<div class="small muted">Нет веток</div>';
+    return;
+  }
+  dirs.forEach(d=>{
+    const div = document.createElement('div'); div.className='dir-item';
+    const left = document.createElement('div');
+    left.innerHTML = `<div style="font-weight:700">${escapeHtml(d.branch)}</div><div class="dir-meta">${d.files} file(s) • ${Math.round(d.size/1024)} KB</div>`;
+    const right = document.createElement('div');
+    const btnDownload = document.createElement('button'); btnDownload.className='ghost'; btnDownload.innerText='Download zip';
+    btnDownload.onclick = ()=> { window.open(`${API}/download_dir/${encodeName(d.branch)}`, '_blank'); };
+    const btnSelect = document.createElement('button'); btnSelect.className='ghost'; btnSelect.innerText='Select';
+    btnSelect.onclick = ()=> { selectBranch(d.branch); };
+    right.appendChild(btnSelect); right.appendChild(btnDownload);
+    div.appendChild(left); div.appendChild(right);
+    el.appendChild(div);
+  });
+}
+
+function selectBranch(branch){
+  selectedBranch = branch;
+  document.getElementById('btnDownloadSelected').disabled = false;
+  document.getElementById('btnDownloadSelected').onclick = ()=> { window.open(`${API}/download_dir/${encodeName(branch)}`, '_blank'); };
+  toast('Selected: ' + branch, 1500);
 }
 
 /* ========== Runs UI ========== */
@@ -495,8 +572,20 @@ async function stopRun(run_id){
 
 async function stopAll(){
   if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
-  const keys = Object.keys(activeRuns);
-  for(const k of keys) await stopRun(k);
+  if(!confirm('Stop all runs?')) return;
+  try {
+    const res = await fetch(`${API}/stop_all`, { method: 'POST', headers: defaultHeaders() });
+    if(res.ok){
+      toast('Stopped all runs');
+      activeRuns = {};
+      renderRuns();
+    } else {
+      toast('Stop all failed');
+    }
+  } catch(e){
+    console.error('stopAll', e);
+    toast('Stop all error');
+  }
 }
 
 async function fetchLogForFile(fname){
@@ -514,7 +603,7 @@ async function fetchLogForFile(fname){
 }
 
 function downloadRunLog(run_id){
-  const url = `${API}/logs/${encodeURIComponent(run_id)}`;
+  const url = `${API}/logs/${encodeName(run_id)}`;
   window.open(url, '_blank');
 }
 
@@ -523,7 +612,6 @@ function showLoginModal(open = true){
   document.getElementById('loginModalWrap').style.display = open ? 'block' : 'none';
   if(open){
     document.getElementById('loginInput').focus();
-    // when modal open, prevent interacting with app content by aria-hidden attr
     document.getElementById('appRoot').setAttribute('aria-hidden', 'true');
   } else {
     document.getElementById('loginError').style.display = 'none';
@@ -571,9 +659,10 @@ async function handleLogin(){
       saveUser(newUser);
       showLoginModal(false);
       toast('Logged in successfully', 2500);
-      // after login, init WS and load files
+      // after login, init WS and load files/dirs
       initWS();
       await refreshFiles();
+      await loadDirs();
     } else {
       errEl.innerText = 'Неправильный логин или пароль';
       errEl.style.display = 'block';
@@ -600,8 +689,9 @@ function handleLogout(){
   renderFiles();
   activeRuns = {};
   renderRuns();
+  dirs = [];
+  renderDirs();
   toast('Logged out', 1500);
-  // require login again
   setTimeout(()=> showLoginModal(true), 200);
 }
 
@@ -609,7 +699,7 @@ function handleLogout(){
 document.getElementById('btnStart').onclick = ()=> startCrawl(false);
 document.getElementById('btnStartBG').onclick = ()=> startCrawl(true);
 document.getElementById('btnList').onclick = ()=> refreshFiles();
-document.getElementById('btnRefresh').onclick = ()=> { if(!user){ showLoginModal(true); toast('Вход обязателен'); return; } refreshFiles(); toast('Refreshed'); };
+document.getElementById('btnRefresh').onclick = ()=> { if(!user){ showLoginModal(true); toast('Вход обязателен'); return; } refreshFiles(); loadDirs(); toast('Refreshed'); };
 document.getElementById('clearSearch').onclick = ()=> { document.getElementById('q').value=''; renderFiles(); };
 document.getElementById('q').oninput = ()=> renderFiles();
 document.getElementById('sort').onchange = ()=> renderFiles();
@@ -630,10 +720,12 @@ document.getElementById('btnShowFiles').onclick = ()=> {
   refreshFiles();
 };
 document.getElementById('btnClearOutputs').onclick = ()=> { filesIndex.clear(); filesOrder=[]; renderFiles(); toast('Cleared local list'); };
-document.getElementById('btnStopAll').onclick = ()=> { if(!user){ showLoginModal(true); toast('Вход обязателен'); return; } if(confirm('Stop all runs?')) stopAll(); };
+document.getElementById('btnStopAll').onclick = ()=> { if(!user){ showLoginModal(true); toast('Вход обязателен'); return; } stopAll(); };
 document.getElementById('toggleTheme').onclick = ()=> {
   if(document.documentElement.classList.contains('light')){ document.documentElement.classList.remove('light'); localStorage.setItem('theme','dark'); } else { document.documentElement.classList.add('light'); localStorage.setItem('theme','light'); }
 };
+document.getElementById('btnRefreshDirs').onclick = ()=> loadDirs();
+document.getElementById('btnDownloadSelected').onclick = ()=> { if(selectedBranch) window.open(`${API}/download_dir/${encodeName(selectedBranch)}`, '_blank'); };
 
 /* Login buttons */
 document.getElementById('btnLogin').onclick = ()=> showLoginModal(true);
@@ -644,7 +736,6 @@ document.getElementById('btnLogout').onclick = ()=> handleLogout();
 /* close modal on backdrop click */
 document.getElementById('loginBackdrop').onclick = (e)=> {
   if(e.target === document.getElementById('loginBackdrop')) {
-    // Do not allow closing modal if not logged in (mandatory)
     if(user) showLoginModal(false);
   }
 };
@@ -652,16 +743,14 @@ document.getElementById('loginBackdrop').onclick = (e)=> {
 /* ========== Init: require login on load ========== */
 loadUser();
 if(user && user.apiKey){
-  // if user already in localStorage, initialize
   initWS();
   refreshFiles();
+  loadDirs();
 } else {
-  // force login modal (required)
   showLoginModal(true);
-  // ensure controls reflect logged-out state
   updateUserUI();
 }
-
 </script>
+
 </body>
 </html>
