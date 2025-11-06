@@ -19,7 +19,6 @@ DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; ChatGPTBot/1.0; +https://openai.c
 DEFAULT_CONCURRENCY = 5
 DEFAULT_SLEEP = 0.2
 MAX_RAW_HTML_BYTES = 200_000
-SNIPPET_LEN = 300  # send only this many chars in ws snippet
 
 def setup_logging(level=logging.INFO):
     fmt = "%(asctime)s [%(levelname)s] %(message)s"
@@ -54,14 +53,16 @@ def is_same_host_or_prefix(url: str, base_netloc: str, target_prefix: Optional[s
     return True
 
 
-def make_safe_filename(index: int, url: str, title: str) -> str:
+def make_safe_basename(index: int, url: str, title: str) -> str:
+    """
+    Return a base filename (without extension) used for saved files.
+    """
     parsed = urlparse(url)
     path = parsed.path.rstrip("/")
     last = path.split("/")[-1] or "page"
     base = slugify(last) or slugify(title or "") or "page"
     h = hashlib.md5(url.encode("utf-8")).hexdigest()[:6]
-    # use .md filename
-    return f"{index:05d}_{base}_{h}.md"
+    return f"{index:05d}_{base}_{h}"
 
 
 def extract_text(soup: BeautifulSoup) -> tuple[str, str]:
@@ -177,11 +178,7 @@ class AsyncCrawler:
                         if "text/html" not in ctype:
                             self.logger.info("Skipping non-html %s (Content-Type: %s)", url, ctype)
                             return None, resp
-                        # guard against extremely large responses
                         text = await resp.text()
-                        if isinstance(text, str) and len(text) > (MAX_RAW_HTML_BYTES * 10):
-                            # extremely large document — truncate for parsing (prevents memory blow)
-                            text = text[: MAX_RAW_HTML_BYTES * 10]
                         return text, resp
             except (asyncio.TimeoutError, ClientError) as e:
                 self.logger.warning("Fetch error for %s (attempt %d): %s", url, attempt, e)
@@ -229,50 +226,63 @@ class AsyncCrawler:
     async def parse_and_save(self, url: str, html: str):
         soup = BeautifulSoup(html, "html.parser")
         title, content = extract_text(soup)
+        data = {
+            "url": url,
+            "title": title,
+            "content": content,
+            "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        }
 
-        # create markdown file only (no JSON)
-        md_name = make_safe_filename(self.index + 1, url, title)  # index not yet incremented
-        md_path = self._branch_path_for_url(url) / md_name
+        # We no longer save JSON files — only .md
+        self.index += 1
+        base_name = make_safe_basename(self.index, url, title)
+        md_name = f"{base_name}.md"
+
+        # determine branch directory and save file there
+        branch_dir = self._branch_path_for_url(url)
+        md_path = branch_dir / md_name
 
         try:
             async with aiofiles.open(md_path, mode="w", encoding="utf-8") as f:
-                await f.write(f"# {title}\n\n")
-                await f.write(f"Source: {url}\n\n")
-                await f.write(content or "")
-                # optionally include raw_html if save_html True (capped)
-                if self.save_html:
-                    raw = html
-                    if isinstance(raw, str) and len(raw) > MAX_RAW_HTML_BYTES:
-                        raw = raw[:MAX_RAW_HTML_BYTES] + "\n\n<!-- truncated -->"
-                    await f.write("\n\n---\n\n")
-                    await f.write("<!-- raw_html included, truncated -->\n\n")
-                    await f.write(raw)
+                await f.write(f"# {data.get('title','')}\n\n")
+                await f.write(f"Source: {data['url']}\n\n")
+                await f.write(data.get("content", ""))
         except Exception:
             self.logger.exception("Failed to write MD file %s", md_path)
 
-        # increment index after successful save
-        self.index += 1
+        # Optionally save raw HTML truncated (if user requested save_html)
+        if self.save_html:
+            raw_html = html
+            if isinstance(raw_html, str) and len(raw_html) > MAX_RAW_HTML_BYTES:
+                raw_html = raw_html[:MAX_RAW_HTML_BYTES] + "\n\n<!-- truncated -->"
+            raw_name = f"{base_name}.html"
+            raw_path = branch_dir / raw_name
+            try:
+                async with aiofiles.open(raw_path, mode="w", encoding="utf-8") as f:
+                    await f.write(raw_html)
+            except Exception:
+                self.logger.exception("Failed to write raw HTML file %s", raw_path)
 
         self.logger.info("Saved [%d] %s -> %s", self.index, url, str(md_path.relative_to(self.output_dir)))
         if self.pbar:
             self.pbar.update(1)
 
-        # --- realtime push to UI via status_callback ---
+        # --- realtime push to UI via status_callback (file points to md) ---
         if self.status_callback:
             try:
+                MAX_CONTENT_LEN = 300
+                # branch relative path
                 branch_rel = str(md_path.parent.relative_to(self.output_dir))
-                snippet = (content or "")[:SNIPPET_LEN]
                 payload = {
                     "type": "saved",
                     "index": self.index,
                     "file": str(Path(branch_rel) / md_name),
                     "url": url,
                     "title": title,
-                    "snippet": snippet,
-                    "branch": branch_rel,
-                    "ts": int(time.time() * 1000)
+                    "content": (content or "")[:MAX_CONTENT_LEN],
+                    "branch": branch_rel
                 }
-                # call synchronous callback (which may schedule async broadcast)
+                self.logger.debug("Calling status_callback for %s -> %s", url, md_path.name)
                 self.status_callback(payload)
             except Exception:
                 self.logger.exception("status_callback failed after saving file")
@@ -329,13 +339,13 @@ class AsyncCrawler:
             tasks = [asyncio.create_task(self.worker(session)) for _ in range(workers_count)]
             if self.status_callback:
                 try:
-                    self.status_callback({"type": "started", "start_url": self.start_url, "ts": int(time.time() * 1000)})
+                    self.status_callback({"type": "started", "start_url": self.start_url})
                 except Exception:
                     self.logger.exception("status_callback failed for started event")
             await asyncio.gather(*tasks)
         if self.status_callback:
             try:
-                self.status_callback({"type": "finished", "pages_saved": self.index, "ts": int(time.time() * 1000)})
+                self.status_callback({"type": "finished", "pages_saved": self.index})
             except Exception:
                 self.logger.exception("status_callback failed for finished event")
 
