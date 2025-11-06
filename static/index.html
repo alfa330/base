@@ -603,6 +603,13 @@ async function handleLogin(){
     }
     const data = await response.json();
     if (data.status === 'success') {
+      const userRole = data.role || '';
+      if (userRole !== 'sv' && userRole !== 'admin') {
+        errEl.innerText = 'Доступ запрещен. Необходимы права администратора.';
+        errEl.style.display = 'block';
+        setTimeout(()=> { errEl.style.display = 'none'; }, 5000);
+        return;
+      }
       const newUser = {
         role: data.role || null,
         id: data.id || null,
