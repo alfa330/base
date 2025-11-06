@@ -3,12 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Async Crawler — Control (auth required)</title>
+  <title>Async Crawler — Control (optimized)</title>
   <style>
     :root{
       --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#60a5fa; --accent-2:#7c3aed; --text:#e6eef8;
       --glass: rgba(255,255,255,0.03);
-      --radius:12px;
+      --radius:10px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
     }
     :root.light{
       --bg:#f5f7fb; --card:#ffffff; --muted:#667085; --accent:#2563eb; --accent-2:#7c3aed; --text:#0b1220;
@@ -16,23 +17,20 @@
     }
     *{box-sizing:border-box}
     html,body{height:100%; margin:0; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:linear-gradient(180deg,var(--bg), #071029); color:var(--text); -webkit-font-smoothing:antialiased}
-    .container{max-width:1100px; margin:28px auto; padding:20px}
-    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
-    h1{font-size:20px;margin:0}
+    .container{max-width:1100px; margin:24px auto; padding:18px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+    h1{font-size:18px;margin:0}
     .sub{color:var(--muted);font-size:13px}
     .top-actions{display:flex;gap:8px;align-items:center}
-    .card{background:var(--card); padding:14px; border-radius:var(--radius); box-shadow:0 6px 20px rgba(2,6,23,0.5); border:1px solid rgba(255,255,255,0.03)}
-    .grid{display:grid; gap:14px}
-    .cols-3{grid-template-columns: 1.3fr 1fr 0.9fr}
-    .cols-2{grid-template-columns: 1fr 1fr}
+    .card{background:var(--card); padding:12px; border-radius:var(--radius); box-shadow:0 6px 20px rgba(2,6,23,0.5); border:1px solid rgba(255,255,255,0.03)}
+    .grid{display:grid; gap:12px}
+    .cols-3{grid-template-columns: 1.2fr 1fr 0.9fr}
     label{font-size:13px;color:var(--muted)}
-    input[type="text"], input[type="number"], input[type="password"], select { width:100%; padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:var(--text) }
-    input[type="checkbox"]{transform:scale(1.1); margin-right:6px}
-    button { background:linear-gradient(90deg,var(--accent),var(--accent-2)); border:none; color:white; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:600 }
+    input[type="text"], input[type="number"], input[type="password"], select { width:100%; padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:var(--text) }
+    button { background:linear-gradient(90deg,var(--accent),var(--accent-2)); border:none; color:white; padding:8px 10px; border-radius:8px; cursor:pointer; font-weight:600 }
     button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06); color:var(--text); font-weight:600}
     button.plain{background:transparent;border:none;color:var(--accent);padding:6px 8px;border-radius:8px}
-    button:disabled, .ghost[disabled]{opacity:0.45;cursor:not-allowed}
-    .row{display:flex;gap:10px;align-items:center}
+    .row{display:flex;gap:8px;align-items:center}
     .small{font-size:13px;color:var(--muted)}
     .muted{color:var(--muted)}
     #files{max-height:46vh; overflow:auto; display:flex; flex-direction:column; gap:8px; padding-top:8px}
@@ -41,10 +39,10 @@
     .file-actions{display:flex;gap:8px;align-items:center}
     .fname{font-weight:700}
     .ftitle{color:var(--muted); font-size:13px; margin-top:4px}
-    pre.preview{background:rgba(0,0,0,0.12); padding:8px; border-radius:8px; max-height:160px; overflow:auto; margin-top:8px; white-space:pre-wrap}
+    pre.preview{background:rgba(0,0,0,0.12); padding:8px; border-radius:8px; max-height:120px; overflow:auto; margin-top:8px; white-space:pre-wrap; font-family:var(--mono); font-size:12px}
     .runs-list{display:flex;flex-direction:column; gap:8px; max-height:24vh; overflow:auto}
     .run-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:8px;background:var(--glass)}
-    .log-area{height:150px; overflow:auto; background:rgba(0,0,0,0.06); padding:10px; border-radius:8px; font-family:monospace; font-size:12px; color:var(--muted)}
+    .log-area{height:150px; overflow:auto; background:rgba(0,0,0,0.06); padding:10px; border-radius:8px; font-family:var(--mono); font-size:12px; color:var(--muted)}
     .controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
     .search{display:flex; gap:8px; align-items:center; margin-bottom:8px}
     .tag{display:inline-block;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.02);font-size:12px;color:var(--muted)}
@@ -59,7 +57,6 @@
     .modal{width:360px;background:var(--card);padding:16px;border-radius:12px;box-shadow:0 10px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.04)}
     .modal h3{margin:0 0 8px 0}
     .modal .error{color:#f87171;margin-top:8px}
-    .modal .row{margin-top:10px}
     .mini{font-size:12px;color:var(--muted)}
     .preview-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:120;max-width:90%;width:900px;max-height:86vh;overflow:auto}
     .preview-content{background:var(--card);padding:16px;border-radius:12px;border:1px solid rgba(255,255,255,0.04)}
@@ -74,8 +71,8 @@
   <div class="container" id="appRoot" aria-hidden="false">
     <header>
       <div>
-        <h1>Async Crawler — Control</h1>
-        <div class="sub">Запускай обход, смотри результаты в реальном времени через WebSocket</div>
+        <h1>Async Crawler — Control (optimized)</h1>
+        <div class="sub">Уменьшенный поток данных, LRU-ограничение и ленивые загрузки — меньше памяти</div>
       </div>
       <div class="top-actions">
         <div class="small muted">Тек. соединение: <span id="ws_status">—</span></div>
@@ -90,7 +87,7 @@
     </header>
 
 <main class="grid cols-3" style="align-items:start">
-  <!-- Left: Start form + Outputs -->
+  <!-- Left -->
   <section>
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -117,7 +114,7 @@
 
         <div class="row">
           <label><input id="save_html" type="checkbox" /> Save raw HTML</label>
-          <label class="small muted" style="margin-left:auto">Max preview: <span id="max_preview">20000</span> chars</label>
+          <label class="small muted" style="margin-left:auto">Max preview: <span id="max_preview">300</span> chars</label>
         </div>
 
         <div class="controls" style="margin-top:6px">
@@ -130,12 +127,12 @@
       </div>
     </div>
 
-    <div style="height:16px"></div>
+    <div style="height:12px"></div>
 
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div style="font-weight:700">Outputs</div>
-        <div class="small muted">Файлы появляются автоматически</div>
+        <div class="small muted">Показываем только последние</div>
       </div>
 
       <div class="search">
@@ -151,7 +148,7 @@
     </div>
   </section>
 
-  <!-- Middle: Runs and Logs -->
+  <!-- Middle -->
   <aside>
     <div class="card" style="margin-bottom:12px">
       <div style="font-weight:700;margin-bottom:8px">Active runs</div>
@@ -171,7 +168,7 @@
     </div>
   </aside>
 
-  <!-- Right: Directories, Quick actions & help -->
+  <!-- Right -->
   <section>
     <div class="card" style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -189,7 +186,7 @@
     <div class="card">
       <div style="font-weight:700">Quick actions</div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-        <button id="btnShowFiles" class="ghost" disabled>Показать все файлы</button>
+        <button id="btnShowFiles" class="ghost" disabled>Показать все файлы (сервер)</button>
         <button id="btnClearOutputs" class="ghost">Очистить список (локально)</button>
         <button id="btnStopAll" class="btn-danger" disabled>Stop all runs</button>
       </div>
@@ -198,23 +195,22 @@
     <div class="card" style="margin-top:12px">
       <div style="font-weight:700">Help</div>
       <div class="small muted" style="margin-top:8px">
-        • Запуск стартует краулер на сервере. <br>
-        • Каждая сохранённая страница пушится на фронт через WebSocket и отображается в Outputs. <br>
-        • Файлы группируются по веткам (branch). Нажми «Download» рядом с веткой, чтобы скачать zip. <br>
-        • Для управления требуется логин (API key).
+        • WS теперь присылает только маленькие сниппеты → фронт хранит лимит. <br>
+        • Полный файл загружается по клику «Open». <br>
+        • Если нужно, включи режим full-streaming (только для админов).
       </div>
     </div>
   </section>
 </main>
 
 <footer>
-  Crawler UI — оптимизированный интерфейс. Разворачивай, тестируй, улучшай.
+  Crawler UI — оптимизированный интерфейс.
 </footer>
   </div>
 
   <div id="toast" class="toast" style="display:none"></div>
 
-  <!-- Login modal (shown automatically, required) -->
+  <!-- Login modal (required) -->
   <div id="loginModalWrap" style="display:none">
     <div class="modal-backdrop" id="loginBackdrop" aria-hidden="false">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
@@ -238,7 +234,7 @@
   </div>
 
   <!-- Preview modal -->
-  <div id="previewModal" class="preview-modal" style="display:none">
+  <div id="previewModal" class="preview-modal" style="display:none" aria-hidden="true">
     <div class="preview-content card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div id="previewTitle" style="font-weight:700">Preview</div>
@@ -247,36 +243,41 @@
           <button id="previewClose" class="ghost">Close</button>
         </div>
       </div>
-      <pre id="previewBody" style="white-space:pre-wrap;max-height:70vh;overflow:auto;font-family:monospace"></pre>
+      <pre id="previewBody" style="white-space:pre-wrap;max-height:70vh;overflow:auto;font-family:var(--mono)"></pre>
     </div>
   </div>
 
 <script>
-/* ========== CONFIG ========== */
-const API = '/api'; // local crawler backend (expects /list, /start, /stop/:id, /output/:name, /dirs, /download_dir/:branch, /logs/:id)
-const API_BASE_URL = 'https://otp-2-fos4.onrender.com'; // external auth service (provided)
+/* ========= CONFIG (optimized) ========= */
+const API = '/api';
+const API_BASE_URL = 'https://otp-2-fos4.onrender.com';
 const WS_PATH = '/ws';
-const MAX_CONTENT_LEN = 200; // when showing full content in UI, trim to this
-const PREVIEW_LEN = 200; // how many chars of content kept as preview on client
-const FILE_BATCH_MS = 250; // batching window for incoming WS saved events
-const MAX_LOG_CHARS = 10000; // limit log size in UI
 
-/* ========== STATE ========== */
+// Client-side limits
+const PREVIEW_LEN = 300;        // small snippet kept client-side
+const FILE_BATCH_MS = 250;      // window to batch incoming saved events
+const MAX_FILES = 3000;         // absolute LRU cap of stored file entries
+const DISPLAY_LIMIT = 500;      // how many items are rendered into DOM
+const FILE_BUFFER_MAX = 1500;   // buffer size safeguard
+const MAX_LOG_CHARS = 120000;   // keep logs bounded
+
+document.getElementById('max_preview').innerText = PREVIEW_LEN;
+
+/* ========= STATE ========= */
 let ws = null;
 let reconnectTimer = null;
 let pingInterval = null;
-let activeRuns = {}; // run_id -> meta
-let filesIndex = new Map(); // key: relative path (branch/file) -> {name, title, url, content_preview, branch, size, ts}
-let filesOrder = [];
-let theme = localStorage.getItem('theme') || 'dark';
-if(theme === 'light') document.documentElement.classList.add('light'); else document.documentElement.classList.remove('light');
-document.getElementById('max_preview').innerText = PREVIEW_LEN;
 
 let user = null; // {role,id,name,telegram_id,apiKey}
-let dirs = []; // branches list
+let dirs = [];
 let selectedBranch = null;
 
-/* ========== USER STORAGE & UI ========== */
+let filesIndex = new Map(); // name -> entry {name, url, title, snippet, branch, ts, size}
+let filesOrder = []; // names sorted by ts desc
+
+let activeRuns = {}; // run_id -> meta
+
+/* ========= USER STORAGE & UI ========= */
 function loadUser(){
   try{
     const raw = localStorage.getItem('crawler_user');
@@ -286,9 +287,8 @@ function loadUser(){
 }
 function saveUser(u){
   user = u;
-  if(u) {
-    // keep only small user object — do not store large data
-    const safe = { role: u.role || null, id: u.id || null, name: u.name || null, telegram_id: u.telegram_id || null, apiKey: u.apiKey || null };
+  if(u){
+    const safe = { role: u.role || null, id: u.id || null, name: u.name || null, telegram_id: u.telegram_id || null, apiKey: u.apiKey || null};
     localStorage.setItem('crawler_user', JSON.stringify(safe));
   } else {
     localStorage.removeItem('crawler_user');
@@ -311,7 +311,6 @@ function updateUserUI(){
     userName.innerText = user.name + (user.role ? ` (${user.role})` : '');
     btnLogin.style.display = 'none';
     btnLogout.style.display = 'inline-flex';
-    // enable actions
     startBtn.disabled = false;
     startBG.disabled = false;
     listBtn.disabled = false;
@@ -324,7 +323,6 @@ function updateUserUI(){
     userName.innerText = '—';
     btnLogin.style.display = 'inline-flex';
     btnLogout.style.display = 'none';
-    // disable actions
     startBtn.disabled = true;
     startBG.disabled = true;
     listBtn.disabled = true;
@@ -336,7 +334,7 @@ function updateUserUI(){
   }
 }
 
-/* ========== HELPERS ========== */
+/* ========= HELPERS ========= */
 function toast(text, ms=3000){
   const t = document.getElementById('toast');
   t.innerText = text;
@@ -358,68 +356,86 @@ function escapeHtml(s){
   return s.replace(/[&<>"'`]/g, (m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[m]));
 }
 function encodeName(n){ return encodeURIComponent(n); }
-
 function defaultHeaders(){
   const headers = { 'Accept': 'application/json' };
-  if(user && user.apiKey){
-    headers['x-api-key'] = user.apiKey;
-  }
+  if(user && user.apiKey) headers['x-api-key'] = user.apiKey;
   return headers;
 }
 
-/* ========== Batching for WS file updates ========== */
+/* ========= Batching & Buffering for WS updates ========= */
 let fileUpdateBuffer = [];
 let fileRenderTimer = null;
 
 function queueFileUpdate(item){
-    if(fileUpdateBuffer.length > 1000){
-    // apply immediately to avoid unbounded growth
-    clearTimeout(fileRenderTimer);
-    fileRenderTimer = null;
-    for(const it of fileUpdateBuffer) addOrUpdateFileImmediate(it);
-    fileUpdateBuffer = [];
-    renderFiles();
-    return;
-  }
-  // keep only necessary pieces of item to avoid memory bloat
+  // keep only necessary parts
   const slim = {
     file: item.file,
     url: item.url || '',
     title: item.title || '',
-    content: item.content ? (item.content.slice(0, PREVIEW_LEN)) : '',
+    snippet: (item.snippet || item.content || '').slice(0, PREVIEW_LEN),
     branch: item.branch || (item.file && item.file.includes('/') ? item.file.split('/').slice(0,-1).join('/') : ''),
-    run_id: item.run_id || ''
+    run_id: item.run_id || '',
+    ts: Date.now()
   };
+
   fileUpdateBuffer.push(slim);
+
+  // safeguard: if buffer grows too large, flush immediately
+  if(fileUpdateBuffer.length >= FILE_BUFFER_MAX){
+    if(fileRenderTimer){ clearTimeout(fileRenderTimer); fileRenderTimer = null; }
+    flushFileBuffer();
+    return;
+  }
+
   if(fileRenderTimer) return;
   fileRenderTimer = setTimeout(()=> {
-    for(const it of fileUpdateBuffer) addOrUpdateFileImmediate(it);
-    fileUpdateBuffer = [];
-    fileRenderTimer = null;
-    // render once after applying batch
-    renderFiles();
+    flushFileBuffer();
   }, FILE_BATCH_MS);
 }
 
-/* immediate add/update used by the batcher */
+function flushFileBuffer(){
+  if(fileUpdateBuffer.length === 0) { fileRenderTimer = null; return; }
+  // apply items
+  for(const it of fileUpdateBuffer) addOrUpdateFileImmediate(it);
+  fileUpdateBuffer = [];
+  fileRenderTimer = null;
+  renderFiles(); // render only once per batch
+}
+
+/* immediate add/update used by batcher (LRU + trim) */
 function addOrUpdateFileImmediate(item){
   const name = item.file;
   if(!name) return;
-  const now = Date.now();
+  const now = item.ts || Date.now();
   const entry = {
     name,
     url: item.url || '',
     title: item.title || '',
-    content_preview: (item.content || '').slice(0, PREVIEW_LEN),
-    branch: item.branch || (name.includes('/') ? name.split('/').slice(0,-1).join('/') : ''),
+    snippet: (item.snippet || '').slice(0, PREVIEW_LEN),
+    branch: item.branch || '',
     run_id: item.run_id || '',
-    ts: now
+    ts: now,
+    size: item.size || 0
   };
   filesIndex.set(name, entry);
-  filesOrder = Array.from(filesIndex.keys()).sort((a,b)=> filesIndex.get(b).ts - filesIndex.get(a).ts );
+
+  // maintain order as descending ts
+  filesOrder = Array.from(filesIndex.values()).sort((a,b)=> b.ts - a.ts).map(it=>it.name);
+
+  // trim if exceeding MAX_FILES (LRU: drop oldest)
+  if(filesIndex.size > MAX_FILES){
+    // remove oldest entries
+    const sortedAsc = Array.from(filesIndex.values()).sort((a,b)=> a.ts - b.ts);
+    const removeCount = filesIndex.size - MAX_FILES;
+    for(let i=0;i<removeCount;i++){
+      const k = sortedAsc[i].name;
+      filesIndex.delete(k);
+    }
+    filesOrder = Array.from(filesIndex.values()).sort((a,b)=> b.ts - a.ts).map(it=>it.name);
+  }
 }
 
-/* ========== WS (only after login) ========== */
+/* ========= WS (only after login) ========= */
 let wsTrafficBytes = 0;
 function initWS(){
   if(!user || !user.apiKey){
@@ -432,7 +448,6 @@ function initWS(){
   updateWsStatus('connecting');
   ws.onopen = () => { updateWsStatus('connected'); toast('WS connected'); startPing(); startTrafficMonitor(); };
   ws.onmessage = (ev) => {
-    // measure traffic
     try {
       if(typeof ev.data === 'string') wsTrafficBytes += ev.data.length;
       else if(ev.data instanceof ArrayBuffer) wsTrafficBytes += ev.data.byteLength;
@@ -463,14 +478,19 @@ function stopTrafficMonitor(){
   wsTrafficBytes = 0;
 }
 
-/* ========== WS message handling ========== */
+/* ========= WS message handling (supports saved, saved_batch) ========= */
 function handleWsMessage(msg){
   const type = msg.type || msg.event || 'event';
   if(type === 'saved'){
+    // single saved: minimal payload expected (snippet)
     queueFileUpdate(msg);
     logEvent({event:'saved', file: msg.file, run: msg.run_id, branch: msg.branch});
+  } else if(type === 'saved_batch' && Array.isArray(msg.items)){
+    // server-side batched items
+    for(const it of msg.items) queueFileUpdate(it);
+    logEvent({event:'saved_batch', count: msg.items.length});
   } else if(type === 'run_started' || type === 'started'){
-    activeRuns[msg.run_id] = { start_url: msg.start_url || msg.start_url, ts: Date.now() };
+    activeRuns[msg.run_id] = { start_url: msg.start_url || msg.start || '', ts: Date.now() };
     renderRuns();
     logEvent({event:'run_started', run: msg.run_id});
   } else if(type === 'stopping'){
@@ -483,12 +503,16 @@ function handleWsMessage(msg){
     logEvent({event:'stopped_all', runs: msg.runs || []});
     activeRuns = {};
     renderRuns();
+  } else if(type === 'rate_limited'){
+    logEvent({event:'rate_limited', reason: msg.reason || 'server'});
+    // optional: show UI hint
+    toast('Server says rate-limited (reduce stream)');
   } else {
     logEvent(msg);
   }
 }
 
-/* ========== Files UI ========== */
+/* ========= Files UI (only render last DISPLAY_LIMIT items) ========= */
 function renderFiles(){
   const container = document.getElementById('files');
   const q = document.getElementById('q').value.trim().toLowerCase();
@@ -500,7 +524,9 @@ function renderFiles(){
   }
   if(sort === 'new') list.sort((a,b)=> b.ts - a.ts); else list.sort((a,b)=> a.ts - b.ts);
 
-  // build fragment for efficient DOM update
+  // limit how many items we render
+  list = list.slice(0, DISPLAY_LIMIT);
+
   const frag = document.createDocumentFragment();
   for(const it of list){
     const div = document.createElement('div'); div.className = 'file-item';
@@ -510,20 +536,20 @@ function renderFiles(){
                       <div class="ftitle">${escapeHtml(it.title || '')}</div>
                       <div class="small muted">Source: <a href="${escapeHtml(it.url||'#')}" target="_blank">${escapeHtml(it.url||'')}</a></div>
                       <div class="small muted">Branch: ${escapeHtml(it.branch || '')}</div>`;
-    if(it.content_preview){
+    if(it.snippet){
       const pre = document.createElement('pre');
       pre.className = 'preview';
-      pre.innerText = it.content_preview;
+      pre.innerText = it.snippet;
       meta.appendChild(pre);
     }
     const a = document.createElement('a'); a.href = `${API}/output/${encodeName(it.name)}`; a.target='_blank'; a.innerText='Download'; a.className='ghost';
     const btnCopy = document.createElement('button'); btnCopy.innerText='Copy'; btnCopy.className='ghost';
-    btnCopy.onclick = ()=>{ navigator.clipboard.writeText(it.content_preview || '').then(()=> toast('Copied')); };
+    btnCopy.onclick = ()=>{ navigator.clipboard.writeText(it.snippet || '').then(()=> toast('Copied')); };
 
     const btnShowLog = document.createElement('button'); btnShowLog.innerText='Log'; btnShowLog.className='ghost';
     btnShowLog.onclick = ()=> fetchLogForFile(it.name);
 
-    // Open (lazy load full content)
+    // Open: lazy-load full content
     const btnOpen = document.createElement('button'); btnOpen.innerText='Open'; btnOpen.className='ghost';
     btnOpen.onclick = async ()=> {
       await openFullContentModal(it.name, it);
@@ -534,9 +560,18 @@ function renderFiles(){
     frag.appendChild(div);
   }
   container.appendChild(frag);
+
+  // If total files exceed DISPLAY_LIMIT, show a small hint
+  if(filesIndex.size > DISPLAY_LIMIT){
+    const note = document.createElement('div');
+    note.className = 'small muted';
+    note.style.marginTop = '6px';
+    note.innerText = `Показаны последние ${DISPLAY_LIMIT} из ${filesIndex.size} файлов — используйте поиск или скачайте ветку.`;
+    container.appendChild(note);
+  }
 }
 
-/* Lazy fetch + preview modal */
+/* Lazy fetch + preview modal (fetch full file) */
 async function openFullContentModal(name, it){
   const previewModal = document.getElementById('previewModal');
   const previewBody = document.getElementById('previewBody');
@@ -546,9 +581,9 @@ async function openFullContentModal(name, it){
   previewTitle.innerText = name;
   previewBody.innerText = 'Loading...';
   previewModal.style.display = 'block';
+  previewModal.setAttribute('aria-hidden','false');
   document.getElementById('appRoot').setAttribute('aria-hidden', 'true');
 
-  // If server supports /output/:name returning full text, we fetch it.
   try {
     const res = await fetch(`${API}/output/${encodeName(name)}`, { headers: defaultHeaders() });
     if(!res.ok){
@@ -557,7 +592,7 @@ async function openFullContentModal(name, it){
       return;
     }
     const text = await res.text();
-    previewBody.innerText = text.slice(0, MAX_CONTENT_LEN);
+    previewBody.innerText = text.slice(0, 200000); // cap to avoid memory blow
     previewDownload.onclick = ()=> { window.open(`${API}/output/${encodeName(name)}`, '_blank'); };
   } catch(e){
     console.warn('openFullContentModal error', e);
@@ -565,7 +600,7 @@ async function openFullContentModal(name, it){
   }
 }
 
-/* ========== Directories (branches) UI ========== */
+/* ========= Directories (branches) ========= */
 async function loadDirs(){
   if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   try{
@@ -611,7 +646,7 @@ function selectBranch(branch){
   toast('Selected: ' + branch, 1500);
 }
 
-/* ========== Runs UI ========== */
+/* ========= Runs UI ========= */
 function renderRuns(){
   const el = document.getElementById('runs');
   el.innerHTML = '';
@@ -632,7 +667,7 @@ function renderRuns(){
   el.appendChild(frag);
 }
 
-/* ========== API actions ========== */
+/* ========= API actions ========= */
 async function startCrawl(bg=false){
   if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   const start_url = document.getElementById('start_url').value.trim();
@@ -658,7 +693,7 @@ async function startCrawl(bg=false){
   }catch(e){ console.error(e); toast('Start failed'); }
 }
 
-async function stopRun(run_id){
+async function stopCrawl(run_id){
   if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   if(!confirm('Остановить run ' + run_id + '?')) return;
   try{
@@ -710,7 +745,7 @@ function downloadRunLog(run_id){
   window.open(url, '_blank');
 }
 
-/* ========== Login logic (adapted) ========== */
+/* ========= Login logic ========= */
 function showLoginModal(open = true){
   document.getElementById('loginModalWrap').style.display = open ? 'block' : 'none';
   if(open){
@@ -762,7 +797,6 @@ async function handleLogin(){
       saveUser(newUser);
       showLoginModal(false);
       toast('Logged in successfully', 2500);
-      // after login, init WS and load files/dirs
       initWS();
       await refreshFiles();
       await loadDirs();
@@ -798,7 +832,7 @@ function handleLogout(){
   setTimeout(()=> showLoginModal(true), 200);
 }
 
-/* ========== UI wiring ========== */
+/* ========= Wiring ========= */
 document.getElementById('btnStart').onclick = ()=> startCrawl(false);
 document.getElementById('btnStartBG').onclick = ()=> startCrawl(true);
 document.getElementById('btnList').onclick = ()=> refreshFiles();
@@ -820,7 +854,7 @@ document.getElementById('btnDownloadLog').onclick = async ()=> {
 };
 document.getElementById('btnShowFiles').onclick = ()=> {
   if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
-  refreshFiles();
+  refreshFiles(true);
 };
 document.getElementById('btnClearOutputs').onclick = ()=> { filesIndex.clear(); filesOrder=[]; renderFiles(); toast('Cleared local list'); };
 document.getElementById('btnStopAll').onclick = ()=> { if(!user){ showLoginModal(true); toast('Вход обязателен'); return; } stopAll(); };
@@ -830,13 +864,10 @@ document.getElementById('toggleTheme').onclick = ()=> {
 document.getElementById('btnRefreshDirs').onclick = ()=> loadDirs();
 document.getElementById('btnDownloadSelected').onclick = ()=> { if(selectedBranch) window.open(`${API}/download_dir/${encodeName(selectedBranch)}`, '_blank'); };
 
-/* Login buttons */
 document.getElementById('btnLogin').onclick = ()=> showLoginModal(true);
 document.getElementById('loginCancel').onclick = ()=> showLoginModal(false);
 document.getElementById('loginSubmit').onclick = ()=> handleLogin();
 document.getElementById('btnLogout').onclick = ()=> handleLogout();
-
-/* Preview modal buttons */
 document.getElementById('previewClose').onclick = ()=> {
   document.getElementById('previewModal').style.display='none';
   document.getElementById('appRoot').setAttribute('aria-hidden','false');
@@ -849,22 +880,29 @@ document.getElementById('loginBackdrop').onclick = (e)=> {
   }
 };
 
-/* ========== Utilities ========== */
+/* ========= Utilities ========= */
 function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
 
-/* ========== Files list refresh ========== */
-async function refreshFiles(){
+/* ========= Files list refresh (server-side pagination optional) ========= */
+async function refreshFiles(fetchAll=false){
   if(!user){ showLoginModal(true); toast('Вход обязателен'); return; }
   try{
+    // current /api/list returns all .md; for large repos prefer server pagination
     const res = await fetch(`${API}/list`, { headers: defaultHeaders() });
     if(!res.ok) throw new Error('list failed');
     const data = await res.json();
     (data.files || []).forEach(f=>{
       if(!filesIndex.has(f.name)){
-        filesIndex.set(f.name, { name: f.name, title:'', url:'', content_preview: (f.preview || '').slice(0, PREVIEW_LEN), size: f.size || 0, ts: Date.now(), branch: f.name.includes('/') ? f.name.split('/').slice(0,-1).join('/') : '' });
+        filesIndex.set(f.name, { name: f.name, title:'', url:'', snippet: (f.preview || '').slice(0, PREVIEW_LEN), size: f.size || 0, ts: Date.now(), branch: f.name.includes('/') ? f.name.split('/').slice(0,-1).join('/') : '' });
       }
     });
-    filesOrder = Array.from(filesIndex.keys()).sort((a,b)=> filesIndex.get(b).ts - filesIndex.get(a).ts);
+    // enforce MAX_FILES after bulk load
+    if(filesIndex.size > MAX_FILES){
+      const sortedAsc = Array.from(filesIndex.values()).sort((a,b)=> a.ts - b.ts);
+      const removeCount = filesIndex.size - MAX_FILES;
+      for(let i=0;i<removeCount;i++) filesIndex.delete(sortedAsc[i].name);
+    }
+    filesOrder = Array.from(filesIndex.values()).sort((a,b)=> b.ts - a.ts).map(it=>it.name);
     renderFiles();
   }catch(e){
     console.warn('refreshFiles', e);
@@ -872,7 +910,7 @@ async function refreshFiles(){
   }
 }
 
-/* ========== Init: require login on load ========== */
+/* ========= Init: require login on load ========= */
 loadUser();
 if(user && user.apiKey){
   initWS();

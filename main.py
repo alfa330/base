@@ -2,11 +2,12 @@
 import asyncio
 import logging
 import os
+import json
 import shutil
 import tempfile
 from pathlib import Path
 from typing import Optional, List, Dict, Any
-import json
+
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -135,35 +136,117 @@ class StartRequest(BaseModel):
     user_agent: Optional[str] = None
 
 
-def status_logger_factory(run_id: str):
+def status_logger_factory(run_id: str, *,
+                          batch_seconds: float = 0.5,
+                          batch_size: int = 200):
     """
     Returns a synchronous callback `cb(status: dict)` which:
      - appends the status JSON to a log file
-     - schedules an async broadcast to all WS clients
+     - pushes the minimal status into a buffer and schedules a batched broadcast to WS clients
+
+    Batched messages will be sent as:
+      {"type": "saved_batch", "items": [ {..}, {..} ]}
+
+    Minimizes per-file WS traffic and avoids sending full content over WS.
     """
+    lf = OUTPUT_DIR / f"{run_id}.log"
+    buffer: List[dict] = []
+    buffer_lock = asyncio.Lock()
+    flush_handle = None
+
+    async def _flush():
+        nonlocal buffer, flush_handle
+        async with buffer_lock:
+            if not buffer:
+                flush_handle = None
+                return
+            items = buffer
+            buffer = []
+            flush_handle = None
+        # broadcast as one message
+        try:
+            payload = {"type": "saved_batch", "run_id": run_id, "items": items}
+            await ws_manager.broadcast_json(payload)
+            logger.debug("Flushed %d buffered events for run %s", len(items), run_id)
+        except Exception:
+            logger.exception("Failed broadcasting saved_batch for run %s", run_id)
+
+    def schedule_flush(loop: asyncio.AbstractEventLoop, delay: float):
+        nonlocal flush_handle
+        if flush_handle:
+            return
+        # schedule an async task using loop.call_later
+        def _cb():
+            try:
+                asyncio.create_task(_flush())
+            except Exception:
+                # fallback: run_coroutine_threadsafe
+                try:
+                    asyncio.run(_flush())
+                except Exception:
+                    logger.exception("Failed scheduling _flush()")
+        flush_handle = loop.call_later(delay, _cb)
+
     def cb(status: dict):
-        lf = OUTPUT_DIR / f"{run_id}.log"
+        """
+        Synchronous callback expected by crawler; writes log synchronously (append),
+        then schedules buffered WS broadcast.
+        """
+        # write to per-run log (append JSON line)
         try:
             with lf.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(status, ensure_ascii=False) + "\n")
         except Exception:
             logger.exception("Failed to write status log for run %s", run_id)
 
-        # broadcast payload (non-blocking)
+        # buffer minimal info for WS; don't include large fields
+        minimal = {
+            "type": status.get("type", "event"),
+            # expected fields: file, url, title, snippet, branch, index, run-specific meta
+            # copy only safe keys
+            "file": status.get("file"),
+            "url": status.get("url"),
+            "title": status.get("title"),
+            "snippet": status.get("snippet"),
+            "branch": status.get("branch"),
+            "index": status.get("index"),
+            "ts": status.get("ts") or int(asyncio.get_event_loop().time() * 1000)
+        }
+
+        # push into buffer and schedule flush
         try:
-            payload = {"run_id": run_id, **status}
-            # schedule broadcast on running loop
+            loop = asyncio.get_running_loop()
+            # use async lock to mutate buffer
+            async def _push_and_maybe_schedule():
+                async with buffer_lock:
+                    buffer.append(minimal)
+                    # if buffer too large, flush immediately
+                    if len(buffer) >= batch_size:
+                        await _flush()
+                        return
+                    # else schedule flush if not scheduled
+                    loop = asyncio.get_running_loop()
+                    schedule_flush(loop, batch_seconds)
+
+            # schedule push task on loop
+            asyncio.create_task(_push_and_maybe_schedule())
+        except RuntimeError:
+            # not in running loop — fallback: use event loop fetched from get_event_loop
             try:
-                asyncio.get_running_loop()
-                asyncio.create_task(ws_manager.broadcast_json(payload))
-            except RuntimeError:
-                try:
-                    loop = asyncio.get_event_loop()
-                    loop.call_soon_threadsafe(asyncio.create_task, ws_manager.broadcast_json(payload))
-                except Exception:
-                    logger.exception("No loop to schedule WS broadcast for run %s", run_id)
-        except Exception:
-            logger.exception("Failed to schedule ws broadcast for run %s", run_id)
+                loop = asyncio.get_event_loop()
+                # safe scheduling from other thread
+                def _sync_push():
+                    async def _inner():
+                        async with buffer_lock:
+                            buffer.append(minimal)
+                            if len(buffer) >= batch_size:
+                                await _flush()
+                                return
+                            schedule_flush(loop, batch_seconds)
+                    asyncio.create_task(_inner())
+                loop.call_soon_threadsafe(_sync_push)
+            except Exception:
+                logger.exception("No loop to schedule WS broadcast for run %s", run_id)
 
     return cb
 
@@ -183,8 +266,7 @@ async def start_crawl(req: StartRequest):
         max_pages=req.max_pages,
         save_html=req.save_html or False,
         user_agent=req.user_agent or None,
-        status_callback=cb,
-        output_dir=str(OUTPUT_DIR)
+        status_callback=cb
     )
     loop = asyncio.get_running_loop()
     task = loop.create_task(crawler.crawl())
@@ -248,7 +330,7 @@ async def get_status(run_id: str):
 
 @app.get("/api/list")
 async def list_outputs():
-    """Backward-compatible file list (only .md files under OUTPUT_DIR)."""
+    """Return only .md files (no .json)."""
     files = []
     for p in sorted(OUTPUT_DIR.rglob("*.md")):
         if p.is_file():
@@ -259,11 +341,12 @@ async def list_outputs():
 
 @app.get("/api/dirs")
 async def list_dirs():
-    """List branches (top-level netloc folders and nested) with counts and sizes (consider only .md)."""
+    """List branches (directories that contain .md files) with counts and sizes."""
     dirs = []
     base = OUTPUT_DIR
     if not base.exists():
         return {"dirs": []}
+    # walk directories and check for md files
     for p in sorted(base.rglob("*")):
         if p.is_dir():
             md_files = [f for f in p.glob("**/*.md") if f.is_file()]
@@ -302,27 +385,19 @@ async def download_dir(dir_path: str):
     if not target.exists() or not target.is_dir():
         raise HTTPException(status_code=404, detail="Directory not found")
 
-    # create temporary directory to hold archive
+    # create a temporary zip containing only .md files from target
     tmpdir = tempfile.mkdtemp(prefix="crawler-zip-")
     archive_path = os.path.join(tmpdir, "archive.zip")
-
     try:
         with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            # add only .md files, preserving relative paths under the requested dir_path
             for p in target.rglob("*.md"):
                 if p.is_file():
-                    # arcname should be relative path from target (so zip contains the folder structure inside dir_path)
-                    arcname = str(p.relative_to(target))
-                    zf.write(p, arcname=arcname)
+                    arcname = str(p.relative_to(OUTPUT_DIR))
+                    zf.write(p, arcname)
     except Exception:
-        logger.exception("Failed creating zip for %s", target)
-        # cleanup and raise
-        try:
-            if os.path.exists(archive_path):
-                os.remove(archive_path)
-            shutil.rmtree(tmpdir, ignore_errors=True)
-        except Exception:
-            pass
+        logger.exception("Failed to create zip for %s", target)
+        # cleanup
+        shutil.rmtree(tmpdir, ignore_errors=True)
         raise HTTPException(status_code=500, detail="Failed to create archive")
 
     # schedule cleanup in 60s
@@ -343,14 +418,15 @@ async def download_dir(dir_path: str):
 
 @app.get("/api/output/{name:path}")
 async def get_output_file(name: str):
-    # `name` is a relative path inside OUTPUT_DIR
+    # Allow only .md files to be served
     p = (OUTPUT_DIR / name).resolve()
     if not str(p).startswith(str(OUTPUT_DIR.resolve())):
         raise HTTPException(status_code=400, detail="Invalid path")
     if not p.exists():
         raise HTTPException(status_code=404, detail="File not found")
-    # allow any file but typical usage will be .md
-    return FileResponse(p, media_type="application/octet-stream", filename=p.name)
+    if p.suffix.lower() != ".md":
+        raise HTTPException(status_code=400, detail="Only .md files are directly downloadable")
+    return FileResponse(p, media_type="text/markdown", filename=p.name)
 
 
 @app.get("/api/logs/{run_id}")
