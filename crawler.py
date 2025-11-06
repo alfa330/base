@@ -53,14 +53,16 @@ def is_same_host_or_prefix(url: str, base_netloc: str, target_prefix: Optional[s
     return True
 
 
-def make_safe_filename(index: int, url: str, title: str) -> str:
+def make_safe_basename(index: int, url: str, title: str) -> str:
+    """
+    Return a base filename (without extension) used for saved files.
+    """
     parsed = urlparse(url)
     path = parsed.path.rstrip("/")
     last = path.split("/")[-1] or "page"
     base = slugify(last) or slugify(title or "") or "page"
     h = hashlib.md5(url.encode("utf-8")).hexdigest()[:6]
-    # use .md filename
-    return f"{index:05d}_{base}_{h}.md"
+    return f"{index:05d}_{base}_{h}"
 
 
 def extract_text(soup: BeautifulSoup) -> tuple[str, str]:
@@ -224,37 +226,52 @@ class AsyncCrawler:
     async def parse_and_save(self, url: str, html: str):
         soup = BeautifulSoup(html, "html.parser")
         title, content = extract_text(soup)
-        # create markdown file only (no JSON)
-        md_name = make_safe_filename(self.index + 1, url, title)  # index not yet incremented
-        md_path = self._branch_path_for_url(url) / md_name
+        data = {
+            "url": url,
+            "title": title,
+            "content": content,
+            "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        }
+
+        # We no longer save JSON files — only .md
+        self.index += 1
+        base_name = make_safe_basename(self.index, url, title)
+        md_name = f"{base_name}.md"
+
+        # determine branch directory and save file there
+        branch_dir = self._branch_path_for_url(url)
+        md_path = branch_dir / md_name
 
         try:
             async with aiofiles.open(md_path, mode="w", encoding="utf-8") as f:
-                await f.write(f"# {title}\n\n")
-                await f.write(f"Source: {url}\n\n")
-                await f.write(content or "")
-                # optionally include raw_html if save_html True (capped)
-                if self.save_html:
-                    raw = html
-                    if isinstance(raw, str) and len(raw) > MAX_RAW_HTML_BYTES:
-                        raw = raw[:MAX_RAW_HTML_BYTES] + "\n\n<!-- truncated -->"
-                    await f.write("\n\n---\n\n")
-                    await f.write("<!-- raw_html included, truncated -->\n\n")
-                    await f.write(raw)
+                await f.write(f"# {data.get('title','')}\n\n")
+                await f.write(f"Source: {data['url']}\n\n")
+                await f.write(data.get("content", ""))
         except Exception:
             self.logger.exception("Failed to write MD file %s", md_path)
 
-        # increment index after successful save
-        self.index += 1
+        # Optionally save raw HTML truncated (if user requested save_html)
+        if self.save_html:
+            raw_html = html
+            if isinstance(raw_html, str) and len(raw_html) > MAX_RAW_HTML_BYTES:
+                raw_html = raw_html[:MAX_RAW_HTML_BYTES] + "\n\n<!-- truncated -->"
+            raw_name = f"{base_name}.html"
+            raw_path = branch_dir / raw_name
+            try:
+                async with aiofiles.open(raw_path, mode="w", encoding="utf-8") as f:
+                    await f.write(raw_html)
+            except Exception:
+                self.logger.exception("Failed to write raw HTML file %s", raw_path)
 
         self.logger.info("Saved [%d] %s -> %s", self.index, url, str(md_path.relative_to(self.output_dir)))
         if self.pbar:
             self.pbar.update(1)
 
-        # --- realtime push to UI via status_callback ---
+        # --- realtime push to UI via status_callback (file points to md) ---
         if self.status_callback:
             try:
                 MAX_CONTENT_LEN = 20_000
+                # branch relative path
                 branch_rel = str(md_path.parent.relative_to(self.output_dir))
                 payload = {
                     "type": "saved",
@@ -265,7 +282,7 @@ class AsyncCrawler:
                     "content": (content or "")[:MAX_CONTENT_LEN],
                     "branch": branch_rel
                 }
-                self.logger.debug("Calling status_callback for %s -> %s", url, md_name)
+                self.logger.debug("Calling status_callback for %s -> %s", url, md_path.name)
                 self.status_callback(payload)
             except Exception:
                 self.logger.exception("status_callback failed after saving file")

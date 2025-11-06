@@ -2,7 +2,6 @@
 import asyncio
 import logging
 import os
-import json
 import shutil
 import tempfile
 from pathlib import Path
@@ -184,7 +183,8 @@ async def start_crawl(req: StartRequest):
         max_pages=req.max_pages,
         save_html=req.save_html or False,
         user_agent=req.user_agent or None,
-        status_callback=cb
+        status_callback=cb,
+        output_dir=str(OUTPUT_DIR)
     )
     loop = asyncio.get_running_loop()
     task = loop.create_task(crawler.crawl())
@@ -248,7 +248,7 @@ async def get_status(run_id: str):
 
 @app.get("/api/list")
 async def list_outputs():
-    """Return only .md files (no .json)."""
+    """Backward-compatible file list (only .md files under OUTPUT_DIR)."""
     files = []
     for p in sorted(OUTPUT_DIR.rglob("*.md")):
         if p.is_file():
@@ -259,12 +259,11 @@ async def list_outputs():
 
 @app.get("/api/dirs")
 async def list_dirs():
-    """List branches (directories that contain .md files) with counts and sizes."""
+    """List branches (top-level netloc folders and nested) with counts and sizes (consider only .md)."""
     dirs = []
     base = OUTPUT_DIR
     if not base.exists():
         return {"dirs": []}
-    # walk directories and check for md files
     for p in sorted(base.rglob("*")):
         if p.is_dir():
             md_files = [f for f in p.glob("**/*.md") if f.is_file()]
@@ -303,19 +302,27 @@ async def download_dir(dir_path: str):
     if not target.exists() or not target.is_dir():
         raise HTTPException(status_code=404, detail="Directory not found")
 
-    # create a temporary zip containing only .md files from target
+    # create temporary directory to hold archive
     tmpdir = tempfile.mkdtemp(prefix="crawler-zip-")
     archive_path = os.path.join(tmpdir, "archive.zip")
+
     try:
         with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            # add only .md files, preserving relative paths under the requested dir_path
             for p in target.rglob("*.md"):
                 if p.is_file():
-                    arcname = str(p.relative_to(OUTPUT_DIR))
-                    zf.write(p, arcname)
+                    # arcname should be relative path from target (so zip contains the folder structure inside dir_path)
+                    arcname = str(p.relative_to(target))
+                    zf.write(p, arcname=arcname)
     except Exception:
-        logger.exception("Failed to create zip for %s", target)
-        # cleanup
-        shutil.rmtree(tmpdir, ignore_errors=True)
+        logger.exception("Failed creating zip for %s", target)
+        # cleanup and raise
+        try:
+            if os.path.exists(archive_path):
+                os.remove(archive_path)
+            shutil.rmtree(tmpdir, ignore_errors=True)
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail="Failed to create archive")
 
     # schedule cleanup in 60s
@@ -336,15 +343,14 @@ async def download_dir(dir_path: str):
 
 @app.get("/api/output/{name:path}")
 async def get_output_file(name: str):
-    # Allow only .md files to be served
+    # `name` is a relative path inside OUTPUT_DIR
     p = (OUTPUT_DIR / name).resolve()
     if not str(p).startswith(str(OUTPUT_DIR.resolve())):
         raise HTTPException(status_code=400, detail="Invalid path")
     if not p.exists():
         raise HTTPException(status_code=404, detail="File not found")
-    if p.suffix.lower() != ".md":
-        raise HTTPException(status_code=400, detail="Only .md files are directly downloadable")
-    return FileResponse(p, media_type="text/markdown", filename=p.name)
+    # allow any file but typical usage will be .md
+    return FileResponse(p, media_type="application/octet-stream", filename=p.name)
 
 
 @app.get("/api/logs/{run_id}")
