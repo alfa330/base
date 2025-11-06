@@ -1,0 +1,113 @@
+<!-- static/index.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Async Crawler UI</title>
+  <style>
+    body { font-family: Inter, Arial; max-width:900px; margin:20px auto; padding:10px;}
+    input, button { padding:8px; margin:4px 0;}
+    .row { display:flex; gap:8px; align-items:center;}
+    .card { border:1px solid #e3e3e3; padding:12px; border-radius:8px; margin:8px 0; }
+    pre { background:#f6f6f6; padding:8px; overflow:auto;}
+  </style>
+</head>
+<body>
+  <h2>Async Crawler — UI</h2>
+
+  <div class="card">
+    <div><b>Start URL</b></div>
+    <input id="start_url" type="text" placeholder="https://example.com/path" style="width:100%"/>
+    <div class="row">
+      <input id="prefix" type="text" placeholder="Optional path prefix (e.g. /docs)" />
+      <input id="concurrency" type="number" placeholder="concurrency" value="5" style="width:90px" />
+      <label><input id="save_html" type="checkbox" /> save html</label>
+    </div>
+    <div class="row">
+      <button id="btnStart">Start</button>
+      <button id="btnList">List outputs</button>
+    </div>
+    <div id="start_result"></div>
+  </div>
+
+  <div class="card">
+    <div><b>Active runs</b></div>
+    <div id="runs"></div>
+  </div>
+
+  <div class="card">
+    <div><b>Outputs</b></div>
+    <div id="files"></div>
+  </div>
+
+  <div class="card">
+    <div><b>Logs / Last events</b></div>
+    <pre id="log" style="height:220px"></pre>
+  </div>
+
+<script>
+const api = (path, opts) => fetch('/api' + path, opts);
+
+document.getElementById('btnStart').onclick = async () => {
+  const start_url = document.getElementById('start_url').value.trim();
+  if (!start_url) return alert('specify start url');
+  const prefix = document.getElementById('prefix').value || null;
+  const concurrency = parseInt(document.getElementById('concurrency').value || '5', 10);
+  const save_html = document.getElementById('save_html').checked;
+  const body = { start_url, prefix, concurrency, save_html };
+  const res = await api('/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const data = await res.json();
+  document.getElementById('start_result').innerText = JSON.stringify(data, null, 2);
+  refreshRuns();
+};
+
+async function refreshRuns(){
+  // we don't have central registry endpoint; list files and infer runs from logs
+  const res = await api('/list');
+  const data = await res.json();
+  const files = data.files || [];
+  const runsEl = document.getElementById('runs');
+  runsEl.innerHTML = '';
+  // show JSON files and try to detect run log files
+  const logs = files.filter(f=>f.name.endsWith('.json') || f.name.endsWith('.md'));
+  // show last 20
+  for (const f of files.slice(-20).reverse()){
+    const btn = document.createElement('div');
+    btn.innerHTML = `<div style="display:flex;justify-content:space-between;gap:8px;">
+      <div>${f.name}</div>
+      <div>
+        <a href="/api/output/${encodeURIComponent(f.name)}" target="_blank">Download</a>
+      </div>
+    </div>`;
+    document.getElementById('files').prepend(btn);
+  }
+  // also list run logs
+  const logRes = await fetch('/api/list');
+}
+
+document.getElementById('btnList').onclick = refreshRuns;
+
+// poll last logs (simple: pick the newest .log in output_async)
+async function fetchLatestLog(){
+  const res = await api('/list');
+  const data = await res.json();
+  const files = data.files || [];
+  // find .log files
+  const logs = files.filter(f => f.name.endsWith('.log'));
+  if (logs.length === 0) {
+    document.getElementById('log').innerText = 'No logs yet';
+    return;
+  }
+  const latest = logs[logs.length-1].name;
+  const logResp = await fetch('/api/logs/' + latest.replace('.log',''));
+  if (logResp.ok){
+    const text = await logResp.text();
+    document.getElementById('log').innerText = text.slice(-5000);
+  }
+}
+
+setInterval(fetchLatestLog, 3000);
+refreshRuns();
+</script>
+</body>
+</html>
